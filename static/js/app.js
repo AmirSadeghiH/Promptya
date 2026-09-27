@@ -381,6 +381,19 @@
       meta.appendChild(creator);
       meta.appendChild(stats);
       body.appendChild(meta);
+
+      // Image posts carry their prompt into the studio (mirrors post_grid.html).
+      if (post.post_type === "image" && post.prompt) {
+        const use = document.createElement("a");
+        use.className = "use-prompt-btn";
+        use.href = "/studio/?source=" + post.id;
+        use.title = t("studio_use_prompt_title");
+        use.innerHTML =
+          '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3.5 13.9 9l5.6 1.9-5.6 2L12 18.5l-1.9-5.6L4.5 11 10.1 9z"/><path d="M18.5 3.5v3M20 5h-3"/></svg><span></span>';
+        use.querySelector("span").textContent = t("studio_use_prompt");
+        body.appendChild(use);
+      }
+
       article.appendChild(media);
       article.appendChild(body);
       return article;

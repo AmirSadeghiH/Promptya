@@ -35,6 +35,23 @@ class CustomUser(AbstractUser):
         default=0
     )
 
+    # Credit wallet. The signup bonus is granted once, as a ledger entry, by
+    # credits.signals so every credit the user ever holds has a reason.
+    credit_balance = models.PositiveIntegerField(
+        default=0,
+        help_text="Credits available for AI generations. Managed by credits.services.",
+    )
+
+    # Who invited this account, captured from a ?ref= link at signup.  The
+    # referrer is rewarded only after this user's first successful generation.
+    referred_by = models.ForeignKey(
+        "self",
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name="referrals",
+    )
+
     created_at = models.DateTimeField(
         auto_now_add=True
     )

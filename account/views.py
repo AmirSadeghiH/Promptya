@@ -102,6 +102,7 @@ def signup(request):
     email = str(data.get("email", "")).strip().lower()
     password = str(data.get("password", ""))
     display_name = str(data.get("display_name", "")).strip()
+    ref = str(data.get("ref", "")).strip()
 
     errors = {}
     username_error = _validate_username(username)
@@ -124,6 +125,13 @@ def signup(request):
         password=password,
         display_name=display_name or username,
     )
+    if ref:
+        # Stored as a *candidate* referral; the inviter is rewarded only after
+        # this user completes a real generation (see credits.challenges).
+        referrer = User.objects.filter(username__iexact=ref).exclude(pk=user.pk).first()
+        if referrer is not None:
+            user.referred_by = referrer
+            user.save(update_fields=["referred_by"])
     login(request, user)
     return JsonResponse({"user": serialize_user(user, detailed=True)}, status=201)
 

@@ -1,18 +1,20 @@
 from django.contrib.auth import get_user_model
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 
+from credits.challenges import INVITE_FRIEND, challenge_state
 from imagegen.models import AIConfig
 from imagegen.services import (
     MAX_PROMPT_LENGTH,
+    credit_payload,
     prompt_library,
-    quota_state,
     recent_generations,
 )
 from interactions.models import Follow, Save
 from notifications.models import Notification
 from notifications.services import serialize_notification, unread_count
-from posts.models import Category
+from posts.models import Category, Post
 from posts.recommendations import get_recommended_feed, get_suggested_users
 from posts.services import (
     get_explore_data,
@@ -121,20 +123,58 @@ def create_post_page(request):
     return render(request, "web/create.html", context)
 
 
+def _studio_prefill(request):
+    """A prompt handed to the studio by a post's "Use prompt" action.
+
+    ``?source=<post id>`` is preferred over a raw ``?prompt=`` because it also
+    preserves the link back to the post the prompt came from.
+    """
+    raw_prompt = (request.GET.get("prompt") or "").strip()
+    source_id = (request.GET.get("source") or "").strip()
+    post = None
+    if source_id.isdigit():
+        post = Post.objects.select_related("author").filter(pk=int(source_id)).first()
+
+    prompt = (post.prompt.strip() if post and post.prompt else "") or raw_prompt
+    return {
+        "prompt": prompt,
+        "source_post_id": post.pk if post else None,
+        "source_title": post.title if post else "",
+        "source_author": post.author.username if post else "",
+        "source_image": post.image.url if post and post.image else "",
+    }
+
+
 def studio_page(request):
     """The AI studio: a public prompt library plus this account's generations."""
     config = AIConfig.load()
-    quota = quota_state(request.user)
     generations = recent_generations(request.user)
+    wallet = credit_payload(request.user, config)
+    challenges = challenge_state(request.user)
+
+    referral_url = None
+    if request.user.is_authenticated:
+        referral_url = request.build_absolute_uri(reverse("signup")) + (
+            f"?ref={request.user.username}"
+        )
+
     context = {
         **_base_context(request),
         "library": prompt_library(),
-        "quota": quota,
         "generations": generations,
         "prompt_max_length": MAX_PROMPT_LENGTH,
-        # The canvas and the meters re-render from this without a reload.
-        # Rendered with |json_script so a prompt containing markup is escaped.
-        "studio_data": {"quota": quota, "generations": generations},
+        "credits": wallet,
+        "challenges": challenges,
+        "invite_slug": INVITE_FRIEND,
+        "referral_url": referral_url,
+        "prefill": _studio_prefill(request),
+        # The canvas, the wallet and the shelf re-render from this without a
+        # reload.  Rendered with |json_script so a prompt with markup escapes.
+        "studio_data": {
+            "credits": wallet,
+            "generations": generations,
+            "challenges": challenges,
+        },
         # Never hand the admin object to a template — only what it displays.
         "provider": {
             "model": config.model,

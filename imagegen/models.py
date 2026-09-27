@@ -5,9 +5,10 @@ Two tables, two responsibilities:
 * ``AIConfig`` — the model provider credentials and model name.  One row,
   created and edited in the Django admin, so an operator can switch provider
   or rotate the API key without a code change or a deploy.
-* ``GeneratedImage`` — one row per generation attempt.  It is both the user's
-  gallery and the ledger the usage limits are counted from, which is why a
-  failed attempt is recorded too (the user should see what went wrong).
+* ``GeneratedImage`` — one row per generation attempt.  It is the user's
+  gallery, the record of what was charged and (for image-to-image) the
+  reference image the result came from.  A failed attempt is recorded too:
+  the user should see what went wrong, and the charge is refunded.
 """
 
 from django.conf import settings
@@ -16,6 +17,7 @@ from django.db import models
 DEFAULT_BASE_URL = "https://api.gapgpt.app/v1"
 DEFAULT_MODEL = "gapgpt/z-image"
 DEFAULT_SIZE = "1024x1024"
+DEFAULT_CREDIT_COST = 80
 
 
 class AIConfig(models.Model):
@@ -51,6 +53,12 @@ class AIConfig(models.Model):
         help_text="How long to wait for the provider before giving up.",
     )
 
+    credit_cost = models.PositiveIntegerField(
+        default=DEFAULT_CREDIT_COST,
+        help_text=("Credits charged per generation. Configurable per "
+                   "model/provider by editing this row."),
+    )
+
     is_enabled = models.BooleanField(
         default=True,
         help_text="Turn the studio's generate button off without deleting the key.",
@@ -83,10 +91,6 @@ class GeneratedImage(models.Model):
         READY = "ready", "Ready"
         FAILED = "failed", "Failed"
 
-    # Statuses that count against a quota window.  A failed attempt costs the
-    # user nothing, so a provider outage never burns their daily allowance.
-    COUNTED_STATUSES = (Status.PENDING, Status.READY)
-
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
@@ -108,6 +112,18 @@ class GeneratedImage(models.Model):
         upload_to="generated_images/%Y/%m/",
         blank=True,
         null=True,
+    )
+
+    source_image = models.ImageField(
+        upload_to="generated_sources/%Y/%m/",
+        blank=True,
+        null=True,
+        help_text="The reference image this generation was remixed from (image-to-image).",
+    )
+
+    credit_cost = models.PositiveIntegerField(
+        default=0,
+        help_text="Credits charged for this generation, for refunds and audits.",
     )
 
     status = models.CharField(

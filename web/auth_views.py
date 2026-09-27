@@ -27,6 +27,9 @@ def signup_page(request):
     if request.user.is_authenticated:
         return redirect("web:home")
 
+    # A ?ref=username link carries the inviter through the form.  The referral
+    # is only *recorded* here; the reward waits for the friend's first image.
+    ref = (request.POST.get("ref") or request.GET.get("ref") or "").strip()
     error = None
     if request.method == "POST":
         username = request.POST.get("username", "").strip()
@@ -44,10 +47,14 @@ def signup_page(request):
             user = User.objects.create_user(
                 username=username, email=email, password=password, display_name=username
             )
+            referrer = User.objects.filter(username__iexact=ref).exclude(pk=user.pk).first()
+            if referrer is not None:
+                user.referred_by = referrer
+                user.save(update_fields=["referred_by"])
             login(request, user)
             return redirect("web:home")
 
-    return render(request, "web/signup.html", {"error": error})
+    return render(request, "web/signup.html", {"error": error, "ref": ref})
 
 
 def logout_view(request):

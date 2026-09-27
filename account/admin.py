@@ -20,6 +20,7 @@ class CustomUserAdmin(UserAdmin):
     fieldsets = UserAdmin.fieldsets + (
         ("Profile", {"fields": ("display_name", "biography", "profile_picture", "is_verified")}),
         ("Gamification", {"fields": ("level", "experience")}),
+        ("Credits", {"fields": ("credit_balance", "referred_by")}),
         ("Timestamps", {"fields": ("created_at", "updated_at")}),
     )
     readonly_fields = ("created_at", "updated_at", "last_login", "date_joined")

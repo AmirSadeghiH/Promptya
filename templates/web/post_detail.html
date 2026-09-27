@@ -85,7 +85,24 @@
       <span class="stat-pill">{{ post.comment_count }} {{ i18n.comments }}</span>
     </div>
 
-    {% if post.video or post.image %}{% else %}
+    {% if post.post_type == "image" and post.prompt %}
+      {% comment %}Remix is the primary action on an image post: carry the
+      prompt and the post id into the studio so the result links back here.{% endcomment %}
+      <a class="btn btn-primary btn-use-prompt" href="{% url 'web:studio' %}?source={{ post.id }}"
+         title="{{ i18n.studio_use_prompt_title }}">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3.5 13.9 9l5.6 1.9-5.6 2L12 18.5l-1.9-5.6L4.5 11 10.1 9z"/><path d="M18.5 3.5v3M20 5h-3"/></svg>
+        <span data-i18n="studio_remix">{{ i18n.studio_remix }}</span>
+      </a>
+      <button class="btn btn-outline copy-btn" data-action="copy" data-post-id="{{ post.id }}">
+        {{ i18n.copy }} {{ i18n.the_prompt }}
+      </button>
+    {% elif post.video or post.image %}
+      {% if post.prompt %}
+        <button class="btn btn-outline copy-btn" data-action="copy" data-post-id="{{ post.id }}">
+          {{ i18n.copy }} {{ i18n.the_prompt }}
+        </button>
+      {% endif %}
+    {% else %}
       {% if post.prompt %}
         <button class="btn btn-primary btn-copy-cta copy-btn" data-action="copy" data-post-id="{{ post.id }}">
           {{ i18n.copy }} {{ i18n.the_prompt }}

@@ -3,7 +3,7 @@
 {% block title %}{{ i18n.studio }} · Promptly{% endblock %}
 {% block description %}Generate your own AI images in the Promptly studio: copy a prompt from the community library, or write one, and run it through {{ provider.model }}.{% endblock %}
 {% block og_title %}{{ i18n.studio }} · Promptly{% endblock %}
-{% block og_description %}Copy a prompt, generate an image. Three free generations a day on Promptly.{% endblock %}
+{% block og_description %}Copy a prompt, generate an image. Start with 200 free credits on Promptly.{% endblock %}
 
 {% block content %}
 <div class="studio-head">
@@ -22,28 +22,48 @@
 </div>
 
 {% comment %}
-  Two columns: the composer on the left (what you type) and the allowance on
-  the right (what you have left). The canvas below is where the image lands.
+  Two columns: the composer on the left (what you type, plus an optional
+  reference image) and the wallet on the right (what a generation costs and
+  what is left). The canvas below is where the image lands.
 {% endcomment %}
 <div class="studio-top">
   <section class="studio-composer" aria-labelledby="studio-composer-title">
     <h2 class="sr-only" id="studio-composer-title" data-i18n="studio_composer">{{ i18n.studio_composer }}</h2>
 
-    <form id="studio-form" novalidate data-max-length="{{ prompt_max_length }}">
+    <form id="studio-form" novalidate data-max-length="{{ prompt_max_length }}"
+          data-source-post="{{ prefill.source_post_id|default:'' }}">
       <label class="field studio-field">
         <span data-i18n="studio_prompt_label">{{ i18n.studio_prompt_label }}</span>
         <textarea id="studio-prompt" name="prompt" rows="5" maxlength="{{ prompt_max_length }}"
-                  placeholder="{{ i18n.studio_prompt_placeholder }}"></textarea>
+                  placeholder="{{ i18n.studio_prompt_placeholder }}">{{ prefill.prompt }}</textarea>
       </label>
 
-      <div class="studio-ref" id="studio-ref" hidden>
-        <span class="studio-ref-media" id="studio-ref-media" aria-hidden="true"></span>
+      {% comment %} Optional reference image — this is what turns a plain
+      text-to-image call into an image-to-image one. {% endcomment %}
+      <div class="field studio-source-field">
+        <span class="studio-source-label">
+          <span data-i18n="studio_source_label">{{ i18n.studio_source_label }}</span>
+          <small data-i18n="optional">{{ i18n.optional }}</small>
+        </span>
+        <div class="studio-source" data-upload='{"kind":"image","label":"{{ i18n.studio_source_label|escapejs }}"}'>
+          <input type="file" name="source_image" accept="image/jpeg,image/png,image/webp,image/gif">
+        </div>
+        <p class="studio-source-hint muted" data-i18n="studio_source_hint">{{ i18n.studio_source_hint }}</p>
+      </div>
+
+      <div class="studio-ref" id="studio-ref" {% if not prefill.source_post_id %}hidden{% endif %}>
+        <span class="studio-ref-media" id="studio-ref-media" aria-hidden="true">
+          {% if prefill.source_image %}<img src="{{ prefill.source_image }}" alt="">{% else %}¶{% endif %}
+        </span>
         <span class="studio-ref-body">
           <span class="studio-ref-label" data-i18n="studio_reference">{{ i18n.studio_reference }}</span>
-          <span class="studio-ref-text" id="studio-ref-text" dir="auto"></span>
+          <span class="studio-ref-text" id="studio-ref-text" dir="auto">
+            {% if prefill.source_post_id %}{{ prefill.source_title }}{% if prefill.source_author %} · @{{ prefill.source_author }}{% endif %}{% endif %}
+          </span>
         </span>
         <button type="button" class="studio-ref-clear" id="studio-ref-clear"
-                aria-label="{{ i18n.studio_reference_clear }}" title="{{ i18n.studio_reference_clear }}">×</button>      </div>
+                aria-label="{{ i18n.studio_reference_clear }}" title="{{ i18n.studio_reference_clear }}">×</button>
+      </div>
 
       <div class="studio-actions">
         <span class="studio-count"><b id="studio-count">0</b>/{{ prompt_max_length }}</span>
@@ -51,6 +71,9 @@
           <button class="btn btn-primary btn-lg" type="submit" id="studio-submit">
             <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m5 3 14 9-14 9z"/></svg>
             <span data-i18n="studio_generate">{{ i18n.studio_generate }}</span>
+            <span class="btn-cost" id="studio-submit-cost">
+              {{ credits.cost }} <span data-i18n="studio_credits_unit">{{ i18n.studio_credits_unit }}</span>
+            </span>
           </button>
         {% else %}
           <a class="btn btn-primary btn-lg" href="{% url 'login' %}?next={% url 'web:studio' %}">
@@ -66,30 +89,31 @@
     </form>
   </section>
 
-  <aside class="studio-quota" aria-labelledby="studio-quota-title">
-    <h2 class="studio-quota-title" id="studio-quota-title" data-i18n="studio_quota_title">{{ i18n.studio_quota_title }}</h2>
+  <aside class="studio-quota studio-wallet" aria-labelledby="studio-quota-title">
+    <h2 class="studio-quota-title" id="studio-quota-title" data-i18n="studio_credits_title">{{ i18n.studio_credits_title }}</h2>
 
     {% if user.is_authenticated %}
-      {% for window in quota %}
-        <div class="quota-row" data-quota-key="{{ window.key }}"
-             data-used="{{ window.used }}" data-limit="{{ window.limit }}">
-          <div class="quota-row-head">
-            <span class="quota-label" data-i18n="{{ window.label_key }}">{{ i18n|get:window.label_key }}</span>
-            <span class="quota-value" dir="ltr"><b>{{ window.used }}</b><span>/{{ window.limit }}</span></span>
-          </div>
-          <div class="quota-bar" role="img"
-               aria-label="{{ window.used }} / {{ window.limit }}">
-            <span class="quota-fill" style="width: {{ window.percent }}%"></span>
-          </div>
-          <span class="quota-reset" data-reset="{{ window.reset_in_seconds }}"></span>
-        </div>
-      {% endfor %}
-      <p class="studio-quota-foot muted" data-i18n="studio_quota_foot">{{ i18n.studio_quota_foot }}</p>
+      <div class="wallet-balance">
+        <span class="wallet-figure" id="studio-balance">{{ credits.balance }}</span>
+        <span class="wallet-unit" data-i18n="studio_credits_unit">{{ i18n.studio_credits_unit }}</span>
+      </div>
+
+      <div class="wallet-row">
+        <span data-i18n="studio_cost_label">{{ i18n.studio_cost_label }}</span>
+        <b class="wallet-cost" id="studio-cost-value">{{ credits.cost }}</b>
+      </div>
+
+      <p class="wallet-shortfall" id="studio-shortfall" hidden></p>
+      <p class="wallet-note" id="studio-wallet-note" hidden></p>
+
+      <a class="btn btn-outline btn-sm studio-quota-cta" href="#studio-earn" id="studio-earn-link">
+        <span data-i18n="studio_earn_cta">{{ i18n.studio_earn_cta }}</span>
+      </a>
+      <p class="studio-quota-foot muted" data-i18n="studio_credits_foot">{{ i18n.studio_credits_foot }}</p>
     {% else %}
       <ul class="quota-list">
-        <li><b>3</b> <span data-i18n="studio_quota_day">{{ i18n.studio_quota_day }}</span></li>
-        <li><b>7</b> <span data-i18n="studio_quota_week">{{ i18n.studio_quota_week }}</span></li>
-        <li><b>15</b> <span data-i18n="studio_quota_month">{{ i18n.studio_quota_month }}</span></li>
+        <li><b>200</b> <span data-i18n="studio_signup_credits">{{ i18n.studio_signup_credits }}</span></li>
+        <li><b>{{ credits.cost|default:80 }}</b> <span data-i18n="studio_cost_per_image">{{ i18n.studio_cost_per_image }}</span></li>
       </ul>
       <a class="btn btn-outline btn-sm studio-quota-cta" href="{% url 'signup' %}">
         <span data-i18n="studio_quota_cta">{{ i18n.studio_quota_cta }}</span>
@@ -105,6 +129,54 @@
     request is in flight, and the finished image. One renderer, one place.
   {% endcomment %}
 </section>
+
+{% if user.is_authenticated %}
+{% comment %}
+  Ways to top the wallet back up. Every one of them is *verified* — nothing
+  here pays for a click.
+{% endcomment %}
+<section class="section studio-earn" id="studio-earn" aria-labelledby="studio-earn-title">
+  <div class="studio-library-head">
+    <h2 class="section-title" id="studio-earn-title" data-i18n="studio_earn_title">{{ i18n.studio_earn_title }}</h2>
+    <p class="studio-library-hint muted" data-i18n="studio_earn_hint">{{ i18n.studio_earn_hint }}</p>
+  </div>
+
+  <div class="challenge-grid">
+    {% for challenge in challenges %}
+      <article class="challenge-card" data-challenge="{{ challenge.slug }}"
+               data-needs-evidence="{% if challenge.needs_evidence %}1{% else %}0{% endif %}">
+        <div class="challenge-body">
+          <h3 class="challenge-title">{{ challenge.title }}</h3>
+          <p class="challenge-text muted">{{ challenge.description }}</p>
+
+          {% if challenge.slug == invite_slug and referral_url %}
+            <div class="referral-row">
+              <input class="referral-input" id="referral-url" type="text" readonly
+                     value="{{ referral_url }}" aria-label="{{ i18n.studio_referral_label }}">
+              <button type="button" class="btn btn-outline btn-sm" id="referral-copy"
+                      data-i18n="studio_referral_copy">{{ i18n.studio_referral_copy }}</button>
+            </div>
+          {% endif %}
+        </div>
+        <div class="challenge-foot">
+          <span class="challenge-reward">+{{ challenge.reward }} <span data-i18n="studio_credits_unit">{{ i18n.studio_credits_unit }}</span></span>
+          {% if challenge.complete %}
+            <span class="challenge-done" data-i18n="studio_challenge_done">{{ i18n.studio_challenge_done }}</span>
+          {% elif challenge.needs_evidence %}
+            <button type="button" class="btn btn-primary btn-sm" data-challenge-claim="{{ challenge.slug }}">
+              <span data-i18n="studio_challenge_claim">{{ i18n.studio_challenge_claim }}</span>
+            </button>
+          {% else %}
+            <span class="challenge-auto muted" data-i18n="studio_challenge_auto">{{ i18n.studio_challenge_auto }}</span>
+          {% endif %}
+        </div>
+      </article>
+    {% empty %}
+      <p class="muted" data-i18n="studio_no_challenges">{{ i18n.studio_no_challenges }}</p>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
 
 <section class="section studio-library-section">
   <div class="studio-library-head">
@@ -178,12 +250,21 @@
 <script>
   window.PROMPTLY_STUDIO = {
     endpoint: "{% url 'imagegen:generate' %}",
+    challengeEndpoint: "{% url 'credits:claim-challenge' '__slug__' %}",
     dataId: "studio-data",
     canGenerate: {% if user.is_authenticated and provider.ready %}true{% else %}false{% endif %},
     loginUrl: "{% url 'login' %}?next={% url 'web:studio' %}",
     createUrl: "{% url 'web:create' %}",
-    maxLength: {{ prompt_max_length }}
+    maxLength: {{ prompt_max_length }},
+    prefill: {
+      sourcePostId: {% if prefill.source_post_id %}{{ prefill.source_post_id }}{% else %}null{% endif %},
+      sourceTitle: "{{ prefill.source_title|escapejs }}",
+      sourceAuthor: "{{ prefill.source_author|escapejs }}",
+      sourceText: "{{ prefill.prompt|escapejs }}"
+    }
   };
 </script>
+<script src="{% static 'js/upload.js' %}" defer></script>
+<script src="{% static 'js/player.js' %}" defer></script>
 <script src="{% static 'js/studio.js' %}" defer></script>
 {% endblock %}

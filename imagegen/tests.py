@@ -1,15 +1,14 @@
 """Tests for the AI image studio.
 
 Nothing here touches the network: the provider is injected, so these tests
-pin the behaviour that matters — quota windows, what a failure records, and
-what the endpoint answers.
+pin the behaviour that matters — what a generation costs, what a failure does
+to the wallet, how a reference image is handled, and what the endpoints answer.
 """
 
 import io
 import json
 import shutil
 import tempfile
-from datetime import timedelta
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
@@ -17,19 +16,20 @@ from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from django.urls import reverse
-from django.utils import timezone
 from PIL import Image
 
-from imagegen.client import GenerationError, ImageProvider, ProviderSettings
+from credits.models import CreditTransaction, TransactionKind
+from credits.services import SIGNUP_CREDITS, InsufficientCredits, get_balance
+from imagegen.client import GenerationError, ImageProvider, ProviderSettings, SourceImage
 from imagegen.models import DEFAULT_BASE_URL, AIConfig, GeneratedImage
 from imagegen.services import (
     MAX_PROMPT_LENGTH,
     PromptRejected,
-    QuotaExceeded,
-    check_quota,
+    SourceImageRejected,
+    credit_payload,
     generate_image,
     prompt_library,
-    quota_state,
+    recent_generations,
 )
 from posts.models import Category, Post
 
@@ -49,16 +49,19 @@ class FakeProvider:
         self.error = error
         self.calls = []
 
-    def generate(self, prompt, size):
-        self.calls.append({"prompt": prompt, "size": size})
+    def generate(self, prompt, size, source_image=None):
+        self.calls.append({"prompt": prompt, "size": size, "source_image": source_image})
         if self.error:
             raise self.error
         return self.payload if self.payload is not None else _png_bytes()
 
 
-def _factory(*, payload=None, error=None):
+def _factory(*, payload=None, error=None, sink=None):
     def build(settings):
-        return FakeProvider(settings, payload=payload, error=error)
+        provider = FakeProvider(settings, payload=payload, error=error)
+        if sink is not None:
+            sink.append(provider)
+        return provider
 
     return build
 
@@ -78,89 +81,6 @@ class MediaTestCase(TestCase):
         super().tearDownClass()
         cls._media_override.disable()
         shutil.rmtree(cls._media_root, ignore_errors=True)
-
-
-class QuotaTests(MediaTestCase):
-    def setUp(self):
-        self.user = get_user_model().objects.create_user(
-            username="studio-user",
-            email="studio@example.com",
-            password="test-password",
-        )
-
-    def _record(self, *, status=GeneratedImage.Status.READY, age=timedelta(0)):
-        record = GeneratedImage.objects.create(
-            user=self.user,
-            prompt="A prompt",
-            status=status,
-            provider_model="test-model",
-        )
-        GeneratedImage.objects.filter(pk=record.pk).update(
-            created_at=timezone.now() - age
-        )
-        return record
-
-    def test_three_images_in_a_day_block_the_day_window(self):
-        for _ in range(3):
-            self._record()
-
-        state = {entry["key"]: entry for entry in quota_state(self.user)}
-        self.assertEqual(state["day"]["used"], 3)
-        self.assertEqual(state["day"]["remaining"], 0)
-        self.assertEqual(state["week"]["used"], 3)
-        self.assertEqual(state["month"]["used"], 3)
-
-        exceeded = check_quota(self.user)
-        self.assertIsInstance(exceeded, QuotaExceeded)
-        self.assertEqual(exceeded.window, "day")
-        self.assertEqual(exceeded.limit, 3)
-
-    def test_seven_images_in_a_week_block_the_week_window(self):
-        for _ in range(7):
-            self._record(age=timedelta(days=2))
-
-        state = {entry["key"]: entry for entry in quota_state(self.user)}
-        self.assertEqual(state["day"]["used"], 0)
-        self.assertEqual(state["week"]["used"], 7)
-
-        exceeded = check_quota(self.user)
-        self.assertEqual(exceeded.window, "week")
-
-    def test_fifteen_images_in_a_month_block_the_month_window(self):
-        for _ in range(15):
-            self._record(age=timedelta(days=10))
-
-        state = {entry["key"]: entry for entry in quota_state(self.user)}
-        self.assertEqual(state["week"]["used"], 0)
-        self.assertEqual(state["month"]["used"], 15)
-        self.assertEqual(check_quota(self.user).window, "month")
-
-    def test_attempts_older_than_a_window_stop_counting(self):
-        self._record(age=timedelta(hours=25), status=GeneratedImage.Status.READY)
-
-        state = {entry["key"]: entry for entry in quota_state(self.user)}
-        self.assertEqual(state["day"]["used"], 0)
-        self.assertEqual(state["week"]["used"], 1)
-        self.assertIsNone(check_quota(self.user))
-
-    def test_failed_attempts_do_not_burn_the_allowance(self):
-        for _ in range(5):
-            self._record(status=GeneratedImage.Status.FAILED)
-
-        state = {entry["key"]: entry for entry in quota_state(self.user)}
-        self.assertEqual(state["day"]["used"], 0)
-        self.assertIsNone(check_quota(self.user))
-
-    def test_reset_seconds_point_at_the_oldest_attempt(self):
-        self._record(age=timedelta(hours=23))
-        self._record()
-
-        day = quota_state(self.user)[0]
-        self.assertLessEqual(day["reset_in_seconds"], 3600)
-        self.assertGreater(day["reset_in_seconds"], 0)
-
-    def test_quota_state_is_empty_for_anonymous_users(self):
-        self.assertEqual(quota_state(None), [])
 
 
 class GenerationTests(MediaTestCase):
@@ -201,7 +121,17 @@ class GenerationTests(MediaTestCase):
         self.assertEqual(captured["settings"].model, "gapgpt/z-image")
         self.assertEqual(captured["settings"].base_url, "https://api.gapgpt.app/v1")
 
-    def test_provider_failure_is_recorded_and_reraised(self):
+    def test_a_successful_generation_charges_the_configured_cost(self):
+        self.assertEqual(get_balance(self.user), SIGNUP_CREDITS)
+
+        generate_image(self.user, "A mountain", provider_factory=_factory())
+
+        self.assertEqual(get_balance(self.user), SIGNUP_CREDITS - 80)
+        charge = CreditTransaction.objects.get(kind=TransactionKind.GENERATION)
+        self.assertEqual(charge.amount, -80)
+        self.assertEqual(charge.balance_after, SIGNUP_CREDITS - 80)
+
+    def test_provider_failure_is_recorded_and_refunded(self):
         with self.assertRaises(GenerationError):
             generate_image(
                 self.user,
@@ -213,7 +143,11 @@ class GenerationTests(MediaTestCase):
         self.assertEqual(record.status, GeneratedImage.Status.FAILED)
         self.assertEqual(record.error, "The provider is down.")
         self.assertFalse(record.image)
-        self.assertIsNone(check_quota(self.user))
+        # The charge was refunded: a failed generation costs nothing.
+        self.assertEqual(get_balance(self.user), SIGNUP_CREDITS)
+        self.assertTrue(
+            CreditTransaction.objects.filter(kind=TransactionKind.REFUND).exists()
+        )
 
     def test_unexpected_provider_bug_becomes_a_generation_error(self):
         with self.assertRaises(GenerationError):
@@ -226,6 +160,7 @@ class GenerationTests(MediaTestCase):
         record = GeneratedImage.objects.get()
         self.assertEqual(record.status, GeneratedImage.Status.FAILED)
         self.assertTrue(record.error)
+        self.assertEqual(get_balance(self.user), SIGNUP_CREDITS)
 
     def test_non_image_payload_is_rejected(self):
         with self.assertRaises(GenerationError):
@@ -235,6 +170,7 @@ class GenerationTests(MediaTestCase):
                 provider_factory=_factory(payload=b"<html>not an image</html>"),
             )
         self.assertEqual(GeneratedImage.objects.get().status, GeneratedImage.Status.FAILED)
+        self.assertEqual(get_balance(self.user), SIGNUP_CREDITS)
 
     def test_empty_prompt_is_rejected(self):
         with self.assertRaises(PromptRejected):
@@ -247,21 +183,24 @@ class GenerationTests(MediaTestCase):
                 self.user, "x" * (MAX_PROMPT_LENGTH + 1), provider_factory=_factory()
             )
 
-    def test_quota_is_enforced_before_calling_the_provider(self):
+    def test_generation_is_refused_when_credits_run_out(self):
         provider = FakeProvider(ProviderSettings("https://api.example/v1", "sk", "m"))
+        called = []
 
         def build(settings):
             called.append(True)
             return provider
 
-        called = []
-        for _ in range(3):
-            generate_image(self.user, "A mountain", provider_factory=_factory())
+        # 200 credits afford two 80-credit images, and not a third.
+        generate_image(self.user, "A mountain", provider_factory=_factory())
+        generate_image(self.user, "A mountain", provider_factory=_factory())
 
-        with self.assertRaises(QuotaExceeded):
+        with self.assertRaises(InsufficientCredits):
             generate_image(self.user, "A mountain", provider_factory=build)
-        self.assertEqual(called, [])
-        self.assertEqual(GeneratedImage.objects.count(), 3)
+
+        self.assertEqual(called, [])  # the provider was never contacted
+        self.assertEqual(GeneratedImage.objects.count(), 2)
+        self.assertEqual(get_balance(self.user), SIGNUP_CREDITS - 160)
 
     def test_generation_is_refused_without_an_api_key(self):
         AIConfig.objects.update(api_key="", is_enabled=True)
@@ -269,12 +208,84 @@ class GenerationTests(MediaTestCase):
         with self.assertRaises(GenerationError):
             generate_image(self.user, "A mountain", provider_factory=_factory())
         self.assertFalse(GeneratedImage.objects.exists())
+        self.assertEqual(get_balance(self.user), SIGNUP_CREDITS)
 
     def test_generation_is_refused_when_disabled(self):
         AIConfig.objects.update(is_enabled=False)
 
         with self.assertRaises(GenerationError):
             generate_image(self.user, "A mountain", provider_factory=_factory())
+
+
+class ImageToImageTests(MediaTestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user(
+            username="remixer",
+            email="remixer@example.com",
+            password="test-password",
+        )
+        self.config = AIConfig.objects.create(api_key="sk-test", model="gapgpt/z-image")
+
+    def _upload(self, *, name="reference.png", content=None, content_type="image/png"):
+        return SimpleUploadedFile(name, content or _png_bytes(), content_type=content_type)
+
+    def test_source_image_is_sent_to_the_provider_and_stored(self):
+        sink = []
+        record = generate_image(
+            self.user,
+            "Make it winter",
+            source_image=self._upload(),
+            provider_factory=_factory(sink=sink),
+        )
+
+        sent = sink[0].calls[0]["source_image"]
+        self.assertIsInstance(sent, SourceImage)
+        self.assertTrue(sent.data.startswith(b"\x89PNG"))
+
+        self.assertTrue(record.source_image)
+        self.assertTrue(record.source_image.storage.exists(record.source_image.name))
+        # The result and its reference live on the same row: that *is* the link.
+        self.assertIn("/media/generated_sources/", record.source_image.url)
+
+    def test_text_to_image_sends_no_source_image(self):
+        sink = []
+        generate_image(self.user, "A mountain", provider_factory=_factory(sink=sink))
+        self.assertIsNone(sink[0].calls[0]["source_image"])
+
+    def test_a_disguised_file_is_rejected_and_the_charge_refunded(self):
+        with self.assertRaises(SourceImageRejected):
+            generate_image(
+                self.user,
+                "Make it winter",
+                source_image=self._upload(
+                    name="reference.png",
+                    content=b"<?php echo 'not an image'; ?>",
+                    content_type="image/png",
+                ),
+                provider_factory=_factory(),
+            )
+
+        self.assertFalse(GeneratedImage.objects.exists())
+        self.assertEqual(get_balance(self.user), SIGNUP_CREDITS)
+
+    def test_source_image_is_linked_to_a_source_post(self):
+        category = Category.objects.create(name="Art", slug="art")
+        post = Post.objects.create(
+            author=self.user,
+            category=category,
+            post_type=Post.PostType.IMAGE,
+            title="Source",
+            prompt="A cathedral made of glass",
+        )
+        record = generate_image(
+            self.user,
+            "A cathedral made of glass",
+            source_post=post,
+            source_image=self._upload(),
+            provider_factory=_factory(),
+        )
+        self.assertEqual(record.source_post_id, post.pk)
+        self.assertEqual(recent_generations(self.user)[0]["source_post_id"], post.pk)
 
 
 class AIConfigTests(TestCase):
@@ -292,6 +303,16 @@ class AIConfigTests(TestCase):
         config.is_enabled = False
         self.assertFalse(config.is_ready)
 
+    def test_credit_cost_is_configurable_per_provider_row(self):
+        AIConfig.objects.create(api_key="sk-test", credit_cost=250)
+        user = get_user_model().objects.create_user(
+            username="priced", email="priced@example.com", password="test-password"
+        )
+        payload = credit_payload(user)
+        self.assertEqual(payload["cost"], 250)
+        self.assertFalse(payload["can_afford"])
+        self.assertEqual(payload["shortfall"], 50)
+
 
 class ProviderSettingsTests(TestCase):
     def test_incomplete_settings_are_refused(self):
@@ -304,6 +325,13 @@ class ProviderSettingsTests(TestCase):
         settings = ProviderSettings("https://api.example/v1", "", "gapgpt/z-image")
         with self.assertRaises(GenerationError):
             ImageProvider(settings).generate("A mountain", "1024x1024")
+
+    def test_source_image_upload_is_a_mime_typed_file(self):
+        source = SourceImage(filename="reference.png", data=b"\x89PNG\r\n\x1a\n")
+        name, handle, mime = source.as_upload()
+        self.assertEqual(name, "reference.png")
+        self.assertEqual(mime, "image/png")
+        self.assertEqual(handle.read(), b"\x89PNG\r\n\x1a\n")
 
 
 class PromptLibraryTests(MediaTestCase):
@@ -324,9 +352,7 @@ class PromptLibraryTests(MediaTestCase):
             prompt=prompt,
         )
         if image:
-            post.image.save(
-                f"{title}.png", ContentFile(_png_bytes()), save=True
-            )
+            post.image.save(f"{title}.png", ContentFile(_png_bytes()), save=True)
         return post
 
     def test_library_lists_prompts_with_their_output(self):
@@ -380,7 +406,7 @@ class StudioApiTests(MediaTestCase):
         self.client.force_login(self.user)
         self.assertEqual(self.client.get(self.url).status_code, 405)
 
-    def test_successful_generation_returns_the_image_and_quota(self):
+    def test_successful_generation_returns_the_image_and_wallet(self):
         self.client.force_login(self.user)
         with patch("imagegen.services.ImageProvider", _factory()):
             response = self._post_json({"prompt": "A mountain at dawn"})
@@ -389,9 +415,9 @@ class StudioApiTests(MediaTestCase):
         body = response.json()
         self.assertEqual(body["generation"]["prompt"], "A mountain at dawn")
         self.assertIn("/media/generated_images/", body["generation"]["image"])
-        quota = {entry["key"]: entry for entry in body["quota"]}
-        self.assertEqual(quota["day"]["used"], 1)
-        self.assertEqual(quota["day"]["remaining"], 2)
+        self.assertEqual(body["generation"]["credit_cost"], 80)
+        self.assertEqual(body["credits"]["balance"], SIGNUP_CREDITS - 80)
+        self.assertEqual(body["credits"]["cost"], 80)
 
     def test_empty_prompt_is_a_400(self):
         self.client.force_login(self.user)
@@ -407,25 +433,27 @@ class StudioApiTests(MediaTestCase):
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.json()["error_code"], "bad_request")
 
-    def test_exhausted_quota_is_a_429_with_the_reset_time(self):
+    def test_exhausted_credits_is_a_402_with_the_shortfall(self):
         self.client.force_login(self.user)
-        for _ in range(3):
-            GeneratedImage.objects.create(
-                user=self.user, prompt="p", status=GeneratedImage.Status.READY
-            )
+        GeneratedImage.objects.create(
+            user=self.user, prompt="p", status=GeneratedImage.Status.READY
+        )
+        # Spend everything but a sliver.
+        get_user_model().objects.filter(pk=self.user.pk).update(credit_balance=10)
 
         with patch("imagegen.services.ImageProvider", _factory()):
             response = self._post_json({"prompt": "A mountain"})
 
-        self.assertEqual(response.status_code, 429)
+        self.assertEqual(response.status_code, 402)
         body = response.json()
-        self.assertEqual(body["error_code"], "quota_exceeded")
-        self.assertEqual(body["window"], "day")
-        self.assertEqual(body["limit"], 3)
-        self.assertIn("retry_after_seconds", body)
-        self.assertEqual(len(body["quota"]), 3)
+        self.assertEqual(body["error_code"], "insufficient_credits")
+        self.assertEqual(body["balance"], 10)
+        self.assertEqual(body["required"], 80)
+        self.assertEqual(body["shortfall"], 70)
+        # A refused request leaves no half-written generation behind.
+        self.assertEqual(GeneratedImage.objects.count(), 1)
 
-    def test_provider_failure_is_a_502_and_is_recorded(self):
+    def test_provider_failure_is_a_502_and_is_refunded(self):
         self.client.force_login(self.user)
         provider = _factory(error=GenerationError("The provider is down."))
         with patch("imagegen.services.ImageProvider", provider):
@@ -433,6 +461,7 @@ class StudioApiTests(MediaTestCase):
 
         self.assertEqual(response.status_code, 502)
         self.assertEqual(response.json()["error_code"], "provider_error")
+        self.assertEqual(response.json()["credits"]["balance"], SIGNUP_CREDITS)
         self.assertEqual(GeneratedImage.objects.get().status, GeneratedImage.Status.FAILED)
 
     def test_generation_is_refused_when_the_provider_is_unconfigured(self):
@@ -460,6 +489,42 @@ class StudioApiTests(MediaTestCase):
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.json()["generation"]["source_post_id"], source.pk)
 
+    def test_multipart_upload_generates_from_a_reference_image(self):
+        sink = []
+        self.client.force_login(self.user)
+        with patch("imagegen.services.ImageProvider", _factory(sink=sink)):
+            response = self.client.post(
+                self.url,
+                data={
+                    "prompt": "Make it winter",
+                    "source_image": SimpleUploadedFile(
+                        "reference.png", _png_bytes(), content_type="image/png"
+                    ),
+                },
+            )
+
+        self.assertEqual(response.status_code, 201)
+        body = response.json()
+        self.assertIn("/media/generated_sources/", body["generation"]["source_image"])
+        self.assertIsInstance(sink[0].calls[0]["source_image"], SourceImage)
+
+    def test_multipart_upload_rejects_a_fake_image(self):
+        self.client.force_login(self.user)
+        with patch("imagegen.services.ImageProvider", _factory()):
+            response = self.client.post(
+                self.url,
+                data={
+                    "prompt": "Make it winter",
+                    "source_image": SimpleUploadedFile(
+                        "reference.png", b"not really a png", content_type="image/png"
+                    ),
+                },
+            )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["error_code"], "invalid_image")
+        self.assertFalse(GeneratedImage.objects.exists())
+
 
 class StudioPageTests(MediaTestCase):
     def setUp(self):
@@ -476,7 +541,7 @@ class StudioPageTests(MediaTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Log in to generate")
 
-    def test_page_seeds_the_studio_data_and_quota(self):
+    def test_page_seeds_the_wallet_and_the_shelf(self):
         GeneratedImage.objects.create(
             user=self.author, prompt="A latent idea", status=GeneratedImage.Status.READY
         )
@@ -487,8 +552,16 @@ class StudioPageTests(MediaTestCase):
         self.assertContains(response, "studio-data")
         self.assertContains(response, "A latent idea")
         data = response.context["studio_data"]
-        self.assertEqual(data["quota"][0]["used"], 1)
+        self.assertEqual(data["credits"]["balance"], SIGNUP_CREDITS)
+        self.assertEqual(data["credits"]["cost"], 80)
         self.assertEqual(len(data["generations"]), 1)
+
+    def test_page_lists_the_reward_challenges(self):
+        self.client.force_login(self.author)
+        response = self.client.get(self.url)
+        slugs = {challenge["slug"] for challenge in response.context["challenges"]}
+        self.assertEqual(slugs, {"invite_friend", "instagram_share"})
+        self.assertContains(response, "Invite a friend")
 
     def test_library_shows_a_copyable_prompt(self):
         post = Post.objects.create(
@@ -501,3 +574,62 @@ class StudioPageTests(MediaTestCase):
         response = self.client.get(self.url)
         self.assertContains(response, "A cathedral made of glass, refracted light")
         self.assertContains(response, f'data-post-id="{post.pk}"')
+
+    def test_source_post_prefills_the_studio_and_keeps_the_link(self):
+        """The "Use Prompt" flow: ?source=<post id> carries prompt + provenance."""
+        source = Post.objects.create(
+            author=self.author,
+            category=self.category,
+            post_type=Post.PostType.IMAGE,
+            title="Glass cathedral",
+            prompt="A cathedral made of glass, refracted light",
+        )
+        source.image.save("cathedral.png", ContentFile(_png_bytes()), save=True)
+
+        response = self.client.get(self.url, {"source": source.pk})
+        prefill = response.context["prefill"]
+        self.assertEqual(prefill["prompt"], "A cathedral made of glass, refracted light")
+        self.assertEqual(prefill["source_post_id"], source.pk)
+        self.assertEqual(prefill["source_author"], "shelf-owner")
+        self.assertContains(response, f"sourcePostId: {source.pk}")
+        self.assertContains(response, "A cathedral made of glass, refracted light")
+
+    def test_raw_prompt_parameter_prefills_without_a_source(self):
+        response = self.client.get(self.url, {"prompt": "An astronaut in a garden"})
+        prefill = response.context["prefill"]
+        self.assertEqual(prefill["prompt"], "An astronaut in a garden")
+        self.assertIsNone(prefill["source_post_id"])
+        self.assertContains(response, "An astronaut in a garden")
+
+    def test_unknown_source_post_falls_back_to_the_raw_prompt(self):
+        response = self.client.get(self.url, {"source": "999999", "prompt": "Fallback"})
+        self.assertEqual(response.context["prefill"]["prompt"], "Fallback")
+        self.assertIsNone(response.context["prefill"]["source_post_id"])
+
+    def test_image_post_offers_a_use_prompt_action(self):
+        """Every public image post with a prompt points at the studio."""
+        post = Post.objects.create(
+            author=self.author,
+            category=self.category,
+            post_type=Post.PostType.IMAGE,
+            title="Glass cathedral",
+            prompt="A cathedral made of glass",
+        )
+        post.image.save("cathedral.png", ContentFile(_png_bytes()), save=True)
+
+        detail = self.client.get(reverse("web:post-detail", args=[post.pk]))
+        self.assertContains(detail, f"{self.url}?source={post.pk}")
+
+        home = self.client.get(reverse("web:home"))
+        self.assertContains(home, f"{self.url}?source={post.pk}")
+
+    def test_prompt_post_has_no_use_prompt_action(self):
+        post = Post.objects.create(
+            author=self.author,
+            category=self.category,
+            post_type=Post.PostType.PROMPT,
+            title="Glass cathedral",
+            prompt="A cathedral made of glass",
+        )
+        detail = self.client.get(reverse("web:post-detail", args=[post.pk]))
+        self.assertNotContains(detail, f"?source={post.pk}")

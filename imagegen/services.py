@@ -1,15 +1,18 @@
-"""Studio rules: what may be generated, how often, and where it is stored.
+"""Studio rules: what may be generated, what it costs, and where it is stored.
 
 The view layer stays thin — it parses input, calls one of these functions and
 turns the outcome into JSON.  Everything a second caller would need to agree
-with (the quota windows, the prompt limits, how a download becomes a stored
+with (the prompt limits, the credit price, how a download becomes a stored
 file) lives here.
+
+A generation is a two-sided ledger event: credits are charged up front, the
+provider is called, and a failure refunds the charge.  The charge/refund pair
+is what makes a provider outage cost the user nothing.
 """
 
 from __future__ import annotations
 
 import secrets
-from datetime import timedelta
 from io import BytesIO
 
 from django.core.exceptions import ValidationError
@@ -17,10 +20,16 @@ from django.core.files.base import ContentFile
 from django.db.models import Count, Q
 from django.utils import timezone
 
+from credits.services import InsufficientCredits, charge, get_balance, refund
 from posts.models import Post
 from posts.validation import validate_upload_file
 
-from imagegen.client import GenerationError, ImageProvider, ProviderSettings
+from imagegen.client import (
+    GenerationError,
+    ImageProvider,
+    ProviderSettings,
+    SourceImage,
+)
 from imagegen.models import AIConfig, GeneratedImage
 
 try:
@@ -32,17 +41,6 @@ except ImportError:  # pragma: no cover - Pillow is a hard dependency
 # characters is common), and the provider has its own limits.
 MAX_PROMPT_LENGTH = 2000
 
-# Account usage limits, as (key, window length, allowed generations).
-# Windows are rolling, not calendar-based, so the allowance refills
-# continuously instead of resetting at midnight.
-QUOTA_WINDOWS = (
-    ("day", timedelta(hours=24), 3),
-    ("week", timedelta(days=7), 7),
-    ("month", timedelta(days=30), 15),
-)
-
-_LONGEST_WINDOW = max(window for _, window, _ in QUOTA_WINDOWS)
-
 # Formats the provider may hand back, mapped to a safe file extension.
 _EXTENSIONS_BY_FORMAT = {"JPEG": "jpg", "PNG": "png", "WEBP": "webp", "GIF": "gif"}
 
@@ -53,18 +51,12 @@ class PromptRejected(ValueError):
     """The prompt itself cannot be sent (empty, or too long)."""
 
 
-class QuotaExceeded(RuntimeError):
-    """The account has used up one of its rolling windows."""
-
-    def __init__(self, window, limit, retry_after_seconds):
-        self.window = window
-        self.limit = limit
-        self.retry_after_seconds = max(0, int(retry_after_seconds))
-        super().__init__(f"The {window} limit of {limit} images has been reached.")
+class SourceImageRejected(ValueError):
+    """The uploaded reference image is not usable."""
 
 
 # ---------------------------------------------------------------------------
-# Quota
+# Prompt / wallet
 # ---------------------------------------------------------------------------
 
 
@@ -78,52 +70,19 @@ def check_prompt(prompt) -> str:
     return cleaned
 
 
-def quota_state(user, *, now=None) -> list[dict]:
-    """Usage per rolling window, oldest-first, ready for a progress meter."""
-    now = now or timezone.now()
+def credit_payload(user, config=None) -> dict | None:
+    """The wallet shape every studio response carries (balance + price)."""
     if user is None or not getattr(user, "is_authenticated", False):
-        return []
-
-    # One query for every counted attempt in the longest window, then bucket
-    # in Python — cheaper and clearer than one COUNT per window.
-    timestamps = list(
-        GeneratedImage.objects.filter(
-            user=user,
-            created_at__gte=now - _LONGEST_WINDOW,
-            status__in=GeneratedImage.COUNTED_STATUSES,
-        ).values_list("created_at", flat=True)
-    )
-
-    state = []
-    for key, window, limit in QUOTA_WINDOWS:
-        cutoff = now - window
-        used_in_window = [stamp for stamp in timestamps if stamp >= cutoff]
-        used = len(used_in_window)
-        resets_in = 0
-        if used_in_window:
-            oldest = min(used_in_window)
-            resets_in = max(0, int(((oldest + window) - now).total_seconds()))
-        state.append(
-            {
-                "key": key,
-                "label_key": f"studio_quota_{key}",
-                "used": used,
-                "limit": limit,
-                "remaining": max(0, limit - used),
-                "percent": min(100, round(used * 100 / limit)) if limit else 0,
-                "reset_in_seconds": resets_in,
-            }
-        )
-    return state
-
-
-def check_quota(user, *, now=None) -> QuotaExceeded | None:
-    """The first exhausted window, or ``None`` when the account may generate."""
-    now = now or timezone.now()
-    for entry in quota_state(user, now=now):
-        if entry["used"] >= entry["limit"]:
-            return QuotaExceeded(entry["key"], entry["limit"], entry["reset_in_seconds"])
-    return None
+        return None
+    config = config or AIConfig.load()
+    balance = get_balance(user)
+    cost = int(config.credit_cost or 0)
+    return {
+        "balance": balance,
+        "cost": cost,
+        "can_afford": balance >= cost,
+        "shortfall": max(0, cost - balance),
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -131,18 +90,22 @@ def check_quota(user, *, now=None) -> QuotaExceeded | None:
 # ---------------------------------------------------------------------------
 
 
-def generate_image(user, prompt, *, size=None, source_post=None, provider_factory=None):
+def generate_image(
+    user,
+    prompt,
+    *,
+    size=None,
+    source_post=None,
+    source_image=None,
+    provider_factory=None,
+):
     """Generate one image for *user* and store it.
 
-    Records the attempt before calling the provider so a crash mid-request
-    still leaves a visible, counted row.  Raises ``PromptRejected``,
-    ``QuotaExceeded`` or ``GenerationError``.
+    Raises ``PromptRejected``, ``SourceImageRejected``, ``InsufficientCredits``
+    or ``GenerationError``.  Credits are charged before the provider is
+    contacted and refunded if it fails, so the wallet always matches reality.
     """
     cleaned = check_prompt(prompt)
-
-    exceeded = check_quota(user)
-    if exceeded:
-        raise exceeded
 
     config = AIConfig.load()
     if not config.is_ready:
@@ -150,29 +113,81 @@ def generate_image(user, prompt, *, size=None, source_post=None, provider_factor
             "Image generation is turned off right now. Try again once an admin enables it."
         )
 
+    cost = int(config.credit_cost or 0)
+
     record = GeneratedImage.objects.create(
         user=user,
         prompt=cleaned,
         source_post=source_post,
         provider_model=config.model,
+        credit_cost=cost,
         status=GeneratedImage.Status.PENDING,
     )
+
+    # Reserve the credits before doing any work. A refusal here is final: the
+    # user is told, and nothing is owed.
+    try:
+        charge(user, cost, generation=record, note="AI generation")
+    except InsufficientCredits:
+        record.delete()
+        raise
+
+    source = None
+    if source_image is not None:
+        try:
+            source = _store_source_image(record, source_image)
+        except SourceImageRejected:
+            _refund(record)
+            record.delete()
+            raise
 
     # Resolved at call time, not bound as a default, so the provider is
     # swappable (tests inject one; nothing reaches for the network).
     factory = provider_factory or ImageProvider
     provider = factory(ProviderSettings.from_config(config))
     try:
-        payload = provider.generate(cleaned, size or config.image_size)
+        payload = provider.generate(cleaned, size or config.image_size, source)
         _store_image(record, payload)
     except GenerationError as exc:
         _mark_failed(record, str(exc))
+        _refund(record)
         raise
     except Exception as exc:  # unexpected provider-adapter bug
         _mark_failed(record, "Something went wrong while generating this image.")
+        _refund(record)
         raise GenerationError("Something went wrong while generating this image.") from exc
 
+    _notify_referral(user)
     return record
+
+
+def _refund(record):
+    """Give back the charge for a generation that produced nothing.
+
+    Never raises: a bookkeeping hiccup must not mask the real error the user
+    is about to see.
+    """
+    if not record.credit_cost:
+        return
+    try:
+        refund(
+            record.user,
+            record.credit_cost,
+            generation=record,
+            note="Refund for a failed generation",
+        )
+    except Exception:  # pragma: no cover - defensive
+        pass
+
+
+def _notify_referral(user):
+    """Let the rewards layer see the first successful image. Never fatal."""
+    try:
+        from credits.challenges import on_first_generation
+
+        on_first_generation(user)
+    except Exception:  # pragma: no cover - defensive
+        pass
 
 
 def _mark_failed(record, message):
@@ -180,6 +195,31 @@ def _mark_failed(record, message):
     record.error = message
     record.finished_at = timezone.now()
     record.save(update_fields=["status", "error", "finished_at"])
+
+
+def _read_source_image(source_image) -> tuple[str, bytes]:
+    """Validate an uploaded reference image and return (name, bytes)."""
+    try:
+        validate_upload_file(source_image, "image")
+    except ValidationError as exc:
+        raise SourceImageRejected("; ".join(exc.messages)) from exc
+
+    source_image.seek(0)
+    data = source_image.read()
+    if not data:
+        raise SourceImageRejected("The reference image is empty.")
+
+    extension = (source_image.name.rsplit(".", 1)[-1] if "." in source_image.name else "png").lower()
+    return extension, data
+
+
+def _store_source_image(record, source_image) -> SourceImage:
+    """Persist the reference image, then hand the bytes to the provider."""
+    extension, data = _read_source_image(source_image)
+    name = f"source-{record.pk}-{secrets.token_hex(4)}.{extension}"
+    record.source_image.save(name, ContentFile(data), save=False)
+    record.save(update_fields=["source_image"])
+    return SourceImage(filename=name, data=data)
 
 
 def _store_image(record, payload):
@@ -218,7 +258,7 @@ def _sniff_extension(payload) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Library
+# Serialization
 # ---------------------------------------------------------------------------
 
 
@@ -228,9 +268,11 @@ def serialize_generation(record, *, label=None) -> dict:
         "id": record.pk,
         "prompt": record.prompt,
         "image": record.image.url if record.image else None,
+        "source_image": record.source_image.url if record.source_image else None,
         "status": record.status,
         "error": record.error,
         "provider_model": record.provider_model,
+        "credit_cost": record.credit_cost,
         "created_at": record.created_at.isoformat(),
         "label": label or _format_timestamp(record.created_at),
         "source_post_id": record.source_post_id,
@@ -247,6 +289,11 @@ def recent_generations(user, limit=12):
 def _format_timestamp(value):
     local = timezone.localtime(value)
     return f"{local:%Y-%m-%d %H:%M}"
+
+
+# ---------------------------------------------------------------------------
+# Library
+# ---------------------------------------------------------------------------
 
 
 def prompt_library(limit=LIBRARY_LIMIT):

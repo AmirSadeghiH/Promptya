@@ -35,7 +35,9 @@ password `demo-password-123`. Admin: create one with `python manage.py createsup
 | `posts` | Post/Category/Tag models, CRUD API, feeds, trending ranking, search, explore |
 | `interactions` | Like, Save, Comment, Follow, View & Copy events + APIs |
 | `notifications` | Notification model, signals on like/save/comment/follow, read/unread API |
-| `web` | Server-rendered frontend pages (feed, explore, search, detail, create, profile, notifications) |
+| `imagegen` | AI image studio: provider adapter, generation records, prompt library, generate API |
+| `credits` | Credit wallet + ledger, reward challenges, referral attribution, claim API |
+| `web` | Server-rendered frontend pages (feed, explore, search, detail, create, studio, profile, notifications) |
 
 ## API overview (all JSON, under `/api/`)
 
@@ -57,6 +59,39 @@ password `demo-password-123`. Admin: create one with `python manage.py createsup
 **Notifications** — `GET /api/notifications/`, `POST /api/notifications/read-all/`,
 `POST /api/notifications/<id>/read/`
 
+**AI studio & credits** — `POST /api/ai/generate/` (JSON, or `multipart/form-data`
+with `source_image` for image-to-image), `POST /api/credits/challenges/<slug>/claim/`
+
+## AI studio, credits and rewards
+
+The studio (`/studio/`) closes the product loop:
+
+```
+Discover → Use prompt → Generate / remix → Save → Earn credits → Generate again
+```
+
+- **Use prompt.** Every public image post with a prompt carries a "Use prompt"
+  action linking to `/studio/?source=<post id>`, which pre-fills the prompt and
+  remembers the source post so the generated image links back to it.
+- **Text-to-image and image-to-image.** The composer takes an optional reference
+  image (validated exactly like any other upload: extension, size cap, magic
+  bytes, MIME, full Pillow decode and a dimension cap). With one attached, the
+  request goes out as `images.edit`; without, as `images.generate`. Both paths
+  live behind `imagegen/client.py`, so swapping provider means editing one file.
+- **Provider settings** (base URL, API key, model, size, timeout, credit price)
+  are a single admin-edited row (`imagegen.AIConfig`). The credit price is
+  configurable per provider/model.
+- **Credits.** New accounts open with **200 credits** and a standard generation
+  costs **80** (both configurable). Every movement is an immutable row in the
+  credit ledger — `generation`, `reward`, `refund`, `adjustment` — and the
+  balance can never go negative: a charge is a single guarded SQL `UPDATE`, so
+  concurrent requests cannot overdraw it. A failed generation refunds itself.
+- **Challenges.** Rewards are verified, never click-based. Seeded examples:
+  invite a friend (paid once that friend completes their *first* generation,
+  via `?ref=<username>` at signup) and share a generated image on Instagram
+  (requires a real post link and an existing generation). New challenges are a
+  row plus a function in `credits/challenges.py::VERIFIERS`.
+
 ## Design system
 
 - Colors: near-black surfaces (`#0a0a0f` → `#14141c`), violet accent `#8b7cf6`,
@@ -76,7 +111,9 @@ python manage.py test
 
 Covers feeds & ranking, cursor pagination, query-count (N+1) guards, search,
 post CRUD + permissions, like/save/comment/follow toggles, notifications
-(signals + API), auth and profiles.
+(signals + API), auth and profiles — plus media validation, credit charging /
+refunds / concurrent-charge safety, image-to-image uploads, the "Use prompt"
+flow and referral rewards.
 
 ## Production
 
@@ -100,3 +137,5 @@ from a CDN/object store for scale; swap SQLite for Postgres when needed.
 | 8. Frontend | ✅ dark premium minimal, desktop + mobile layouts |
 | 9. PWA | ✅ manifest, service worker, offline page, installable |
 | 10. Testing & Deploy | ✅ test suite + env-based production settings |
+| 11. AI Studio | ✅ prompt library, text-to-image + image-to-image, "Use prompt" from image posts |
+| 12. Credits & Rewards | ✅ configurable price, atomic ledger, refunds, verified challenges, referrals |

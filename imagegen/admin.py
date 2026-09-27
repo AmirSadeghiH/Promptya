@@ -7,7 +7,7 @@ from imagegen.models import AIConfig, GeneratedImage
 class AIConfigAdmin(admin.ModelAdmin):
     """The provider settings screen — the only place a key is entered."""
 
-    list_display = ("model", "base_url", "is_enabled", "has_api_key", "updated_at")
+    list_display = ("model", "base_url", "credit_cost", "is_enabled", "has_api_key", "updated_at")
     readonly_fields = ("updated_at",)
     fieldsets = (
         (
@@ -20,7 +20,13 @@ class AIConfigAdmin(admin.ModelAdmin):
                 ),
             },
         ),
-        ("Generation", {"fields": ("image_size", "timeout_seconds", "is_enabled")}),
+        (
+            "Generation",
+            {
+                "fields": ("image_size", "timeout_seconds", "credit_cost", "is_enabled"),
+                "description": "credits charged per image; raise it for a pricier model.",
+            },
+        ),
         ("Timestamps", {"fields": ("updated_at",)}),
     )
 
@@ -37,7 +43,7 @@ class AIConfigAdmin(admin.ModelAdmin):
 
 @admin.register(GeneratedImage)
 class GeneratedImageAdmin(admin.ModelAdmin):
-    list_display = ("id", "user", "status", "provider_model", "created_at")
+    list_display = ("id", "user", "status", "provider_model", "credit_cost", "created_at")
     list_filter = ("status", "provider_model", "created_at")
     search_fields = ("prompt", "user__username", "error")
     autocomplete_fields = ("user", "source_post")

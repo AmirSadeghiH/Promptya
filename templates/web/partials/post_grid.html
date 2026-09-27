@@ -68,6 +68,14 @@ Expects: posts (list of serialized post dicts)
             </button>
           </div>
         </div>
+        {% if post.post_type == "image" and post.prompt %}
+          {# The whole point of an image post: take its prompt into the studio. #}
+          <a class="use-prompt-btn" href="{% url 'web:studio' %}?source={{ post.id }}"
+             title="{{ i18n.studio_use_prompt_title }}">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3.5 13.9 9l5.6 1.9-5.6 2L12 18.5l-1.9-5.6L4.5 11 10.1 9z"/><path d="M18.5 3.5v3M20 5h-3"/></svg>
+            <span data-i18n="studio_use_prompt">{{ i18n.studio_use_prompt }}</span>
+          </a>
+        {% endif %}
       </div>
     </article>
   {% empty %}

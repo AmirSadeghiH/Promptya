@@ -9,6 +9,7 @@
   {% if error %}<div class="form-error">{{ error }}</div>{% endif %}
   <form method="post" class="auth-form">
     {% csrf_token %}
+    {% if ref %}<input type="hidden" name="ref" value="{{ ref }}">{% endif %}
     <label class="field"><span data-i18n="username">{{ i18n.username }}</span>
       <input type="text" name="username" required minlength="3" maxlength="150" autocomplete="username">
     </label>

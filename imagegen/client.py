@@ -8,6 +8,7 @@ nothing else, and tests inject a fake provider instead of touching the network.
 
 from __future__ import annotations
 
+import io
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
@@ -29,6 +30,18 @@ DATA_URL_MAX_CHARS = 16 * 1024 * 1024
 
 class GenerationError(RuntimeError):
     """A generation failed. The message is safe to show to the user."""
+
+
+@dataclass(frozen=True)
+class SourceImage:
+    """A reference image for image-to-image generation, already validated."""
+
+    filename: str
+    data: bytes
+
+    def as_upload(self):
+        """The (name, file, mime) triple an OpenAI-compatible edit expects."""
+        return (self.filename, io.BytesIO(self.data), _mime_for(self.filename))
 
 
 @dataclass(frozen=True)
@@ -61,8 +74,13 @@ class ImageProvider:
     def __init__(self, settings: ProviderSettings):
         self.settings = settings
 
-    def generate(self, prompt: str, size: str) -> bytes:
+    def generate(self, prompt: str, size: str, source_image: SourceImage | None = None) -> bytes:
         """Generate one image and return its bytes.
+
+        With ``source_image`` this is image-to-image (an edit of the supplied
+        picture); without it, plain text-to-image.  Both paths share the same
+        download and validation, so a new provider only has to implement the
+        request half.
 
         Raises ``GenerationError`` with a user-readable message on any
         failure — a bad key, a rejected prompt, a timeout, a corrupt file.
@@ -72,7 +90,10 @@ class ImageProvider:
                 "The AI provider is not configured yet. Add the API key in the admin panel."
             )
 
-        url = self._request_image_url(prompt, size)
+        if source_image is not None:
+            url = self._request_edit_url(prompt, size, source_image)
+        else:
+            url = self._request_image_url(prompt, size)
         return self._download(url)
 
     # -- internals ---------------------------------------------------------
@@ -101,13 +122,23 @@ class ImageProvider:
         except Exception as exc:  # SDK raises a wide family of errors
             raise GenerationError(_readable_provider_error(exc)) from exc
 
-        data = getattr(response, "data", None) or []
-        if not data:
-            raise GenerationError("The provider returned no image.")
-        url = getattr(data[0], "url", None)
-        if not url:
-            raise GenerationError("The provider returned no image URL.")
-        return url
+        return _response_url(response)
+
+    def _request_edit_url(self, prompt: str, size: str, source_image: SourceImage) -> str:
+        """Image-to-image: hand the reference picture to the provider."""
+        try:
+            response = self._client().images.edit(
+                model=self.settings.model,
+                image=source_image.as_upload(),
+                prompt=prompt,
+                size=size or None,
+            )
+        except GenerationError:
+            raise
+        except Exception as exc:  # the SDK raises a wide family of errors
+            raise GenerationError(_readable_provider_error(exc)) from exc
+
+        return _response_url(response)
 
     def _download(self, url: str) -> bytes:
         if url.startswith("data:"):
@@ -133,6 +164,27 @@ class ImageProvider:
         if not payload:
             raise GenerationError("The provider returned an empty image.")
         return payload
+
+
+def _response_url(response) -> str:
+    data = getattr(response, "data", None) or []
+    if not data:
+        raise GenerationError("The provider returned no image.")
+    url = getattr(data[0], "url", None)
+    if not url:
+        raise GenerationError("The provider returned no image URL.")
+    return url
+
+
+def _mime_for(filename: str) -> str:
+    extension = (filename.rsplit(".", 1)[-1] if "." in filename else "").lower()
+    return {
+        "jpg": "image/jpeg",
+        "jpeg": "image/jpeg",
+        "png": "image/png",
+        "webp": "image/webp",
+        "gif": "image/gif",
+    }.get(extension, "application/octet-stream")
 
 
 def _decode_data_url(url: str) -> bytes:

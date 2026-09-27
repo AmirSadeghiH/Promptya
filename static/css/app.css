@@ -2659,3 +2659,140 @@ html[lang="fa"] .generation-status {
   .studio-chip-size { display: none; }
 }
 
+/* ---------- Credits: wallet, reference image, referral, challenges ---------- */
+
+/* The price rides on the submit button so the cost is never a surprise. */
+.btn-cost {
+  margin-inline-start: 0.45rem;
+  padding-inline-start: 0.5rem;
+  border-inline-start: 1px solid rgba(255, 255, 255, 0.28);
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  opacity: 0.9;
+}
+
+.studio-wallet { gap: 0.7rem; }
+.wallet-balance { display: flex; align-items: baseline; gap: 0.35rem; }
+.wallet-figure {
+  font-family: var(--mono);
+  font-size: 1.85rem;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--accent-hover);
+}
+.wallet-unit { font-size: 0.78rem; color: var(--text-muted); }
+.wallet-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+}
+.wallet-cost { font-family: var(--mono); color: var(--text); }
+.wallet-shortfall {
+  margin: 0;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--danger-soft-border);
+  border-radius: var(--radius-md);
+  background: var(--danger-soft-bg);
+  color: var(--danger-text);
+  font-size: 0.8rem;
+}
+.wallet-shortfall[hidden] { display: none; }
+.wallet-note {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--success);
+}
+.wallet-note[hidden] { display: none; }
+
+/* Reference image picker: the upload component renders the frame + preview. */
+.studio-source-field { margin-top: 0.9rem; }
+.studio-source-label {
+  display: flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  font-size: 0.86rem;
+  color: var(--text-secondary);
+}
+.studio-source-label small { font-size: 0.72rem; color: var(--text-muted); }
+.studio-source-hint { margin: 0.4rem 0 0; font-size: 0.74rem; }
+
+.studio-error-action {
+  display: inline-block;
+  margin-top: 0.35rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: inherit;
+  text-decoration: underline;
+}
+
+/* ---------- Earn credits ---------- */
+.studio-earn .studio-library-head { margin-bottom: 0.9rem; }
+.challenge-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 0.9rem;
+}
+.challenge-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  padding: 1.1rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+.challenge-body { display: flex; flex-direction: column; gap: 0.4rem; }
+.challenge-title { margin: 0; font-size: 0.98rem; font-weight: 600; }
+.challenge-text { margin: 0; font-size: 0.82rem; line-height: 1.5; }
+.challenge-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  margin-top: auto;
+}
+.challenge-reward { font-family: var(--mono); font-size: 0.85rem; color: var(--success); }
+.challenge-done { font-size: 0.82rem; font-weight: 600; color: var(--success); }
+.challenge-auto { font-size: 0.78rem; }
+.referral-row { display: flex; gap: 0.4rem; margin-top: 0.3rem; }
+.referral-input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  font-family: var(--mono);
+  font-size: 0.74rem;
+}
+
+/* "Use prompt" on an image post — the entry point of the whole loop. */
+.use-prompt-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  margin-top: 0.6rem;
+  padding: 0.4rem 0.7rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent-hover);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+.use-prompt-btn:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+.use-prompt-btn .icon { width: 15px; height: 15px; }
+.btn-use-prompt .icon { width: 17px; height: 17px; }
+.generation-source { text-decoration: underline; }
+
+html[lang="fa"] .studio-source-label,
+html[lang="fa"] .challenge-title {
+  letter-spacing: 0;
+  text-transform: none;
+}
+

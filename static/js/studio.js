@@ -1,7 +1,7 @@
 /* Promptly — AI studio.
-   Renders three things from one source of truth: the allowance meter, the
-   result canvas, and the shelf of the user's own generations. The server
-   seeds all three as JSON, so nothing here duplicates a number. */
+   Renders four things from one source of truth: the credit wallet, the result
+   canvas, the shelf of the user's own generations, and the reward challenges.
+   The server seeds all of them as JSON, so nothing here duplicates a number. */
 (function () {
   "use strict";
 
@@ -21,18 +21,28 @@
   var refMedia = document.getElementById("studio-ref-media");
   var refText = document.getElementById("studio-ref-text");
   var refClear = document.getElementById("studio-ref-clear");
+  var balanceEl = document.getElementById("studio-balance");
+  var costEl = document.getElementById("studio-cost-value");
+  var submitCostEl = document.getElementById("studio-submit-cost");
+  var shortfallEl = document.getElementById("studio-shortfall");
+  var walletNoteEl = document.getElementById("studio-wallet-note");
+  var sourceInput = document.querySelector(".studio-source input[type='file']");
 
   var activeSource = null;
   var busy = false;
 
   function readSeed() {
     var node = document.getElementById(config.dataId);
-    if (!node) return { quota: [], generations: [] };
+    if (!node) return { credits: null, generations: [], challenges: [] };
     try {
       var parsed = JSON.parse(node.textContent);
-      return { quota: parsed.quota || [], generations: parsed.generations || [] };
+      return {
+        credits: parsed.credits || null,
+        generations: parsed.generations || [],
+        challenges: parsed.challenges || [],
+      };
     } catch (e) {
-      return { quota: [], generations: [] };
+      return { credits: null, generations: [], challenges: [] };
     }
   }
 
@@ -62,44 +72,37 @@
     return row ? row.split("=")[1] : "";
   }
 
-  function formatDuration(seconds) {
-    var total = Math.max(0, parseInt(seconds, 10) || 0);
-    if (!total) return "";
-    var days = Math.floor(total / 86400);
-    var hours = Math.floor((total % 86400) / 3600);
-    var minutes = Math.max(1, Math.round((total % 3600) / 60));
-    if (days > 0) return t("studio_duration_days", { d: days, h: hours });
-    if (hours > 0) return t("studio_duration_hours", { h: hours, m: minutes });
-    return t("studio_duration_minutes", { m: minutes });
+  /* ---------------- Credit wallet ---------------- */
+
+  function renderCredits(credits) {
+    if (!credits) return;
+    state.credits = credits;
+
+    if (balanceEl) balanceEl.textContent = credits.balance;
+    if (costEl) costEl.textContent = credits.cost;
+    if (submitCostEl) {
+      submitCostEl.innerHTML = credits.cost + " " + t("studio_credits_unit");
+    }
+
+    if (shortfallEl) {
+      if (credits.can_afford) {
+        shortfallEl.hidden = true;
+        shortfallEl.textContent = "";
+      } else {
+        shortfallEl.hidden = false;
+        shortfallEl.textContent = t("studio_insufficient", { n: credits.shortfall });
+      }
+    }
+
+    if (submitBtn) {
+      submitBtn.disabled = busy || !config.canGenerate || !credits.can_afford;
+    }
   }
 
-  /* ---------------- Allowance meter ---------------- */
-
-  function renderQuota(quota) {
-    if (!quota || !quota.length) return;
-    quota.forEach(function (entry) {
-      var row = document.querySelector('.quota-row[data-quota-key="' + entry.key + '"]');
-      if (!row) return;
-
-      row.dataset.used = entry.used;
-      row.dataset.limit = entry.limit;
-      row.classList.toggle("is-full", entry.remaining <= 0);
-
-      var value = row.querySelector(".quota-value");
-      if (value) value.innerHTML = "<b>" + entry.used + "</b><span>/" + entry.limit + "</span>";
-
-      var fill = row.querySelector(".quota-fill");
-      if (fill) fill.style.width = entry.percent + "%";
-
-      var bar = row.querySelector(".quota-bar");
-      if (bar) bar.setAttribute("aria-label", entry.used + " / " + entry.limit);
-
-      var reset = row.querySelector(".quota-reset");
-      if (reset) {
-        var left = formatDuration(entry.reset_in_seconds);
-        reset.textContent = left ? t("studio_quota_resets", { d: left }) : "";
-      }
-    });
+  function noteRemaining(credits) {
+    if (!walletNoteEl || !credits) return;
+    walletNoteEl.hidden = false;
+    walletNoteEl.textContent = t("studio_balance_after", { n: credits.balance });
   }
 
   /* ---------------- Canvas ---------------- */
@@ -156,6 +159,14 @@
     reuse.textContent = t("studio_use_again");
     reuse.addEventListener("click", function () { applyPrompt(generation.prompt, null); });
     actions.appendChild(reuse);
+
+    // A remix keeps its provenance: link back to the prompt it came from.
+    if (generation.source_post_id) {
+      var origin = el("a", "btn btn-ghost btn-sm generation-source");
+      origin.href = "/post/" + generation.source_post_id + "/";
+      origin.textContent = t("studio_reference");
+      actions.appendChild(origin);
+    }
 
     foot.appendChild(actions);
     body.appendChild(foot);
@@ -295,17 +306,22 @@
     errorEl.textContent = "";
   }
 
-  function showError(message, detail) {
+  function showError(message, detail, actionLabel, actionHref) {
     if (!errorEl) return;
     errorEl.hidden = false;
     errorEl.textContent = message;
     if (detail) errorEl.appendChild(el("span", "studio-error-detail", detail));
+    if (actionLabel && actionHref) {
+      var link = el("a", "studio-error-action", actionLabel);
+      link.href = actionHref;
+      errorEl.appendChild(link);
+    }
   }
 
   function setBusy(next) {
     busy = next;
     if (!submitBtn) return;
-    submitBtn.disabled = next;
+    submitBtn.disabled = next || !config.canGenerate || (state.credits && !state.credits.can_afford);
     submitBtn.classList.toggle("is-loading", next);
     if (canvas) canvas.setAttribute("aria-busy", next ? "true" : "false");
   }
@@ -313,15 +329,26 @@
   /* ---------------- Request ---------------- */
 
   function request(prompt) {
-    return fetch(config.endpoint, {
+    var file = sourceInput && sourceInput.files && sourceInput.files[0];
+    var init = {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-CSRFToken": getCookie("csrftoken"),
-      },
+      headers: { "X-CSRFToken": getCookie("csrftoken") },
       credentials: "same-origin",
-      body: JSON.stringify({ prompt: prompt, source_post_id: activeSource }),
-    }).then(function (response) {
+    };
+
+    if (file) {
+      // A reference image makes this a multipart (image-to-image) request.
+      var body = new FormData();
+      body.append("prompt", prompt);
+      if (activeSource) body.append("source_post_id", activeSource);
+      body.append("source_image", file);
+      init.body = body;
+    } else {
+      init.headers["Content-Type"] = "application/json";
+      init.body = JSON.stringify({ prompt: prompt, source_post_id: activeSource });
+    }
+
+    return fetch(config.endpoint, init).then(function (response) {
       return response
         .json()
         .catch(function () { return {}; })
@@ -330,12 +357,14 @@
   }
 
   function handleResult(status, body) {
+    if (body && body.credits) renderCredits(body.credits);
+
     if (status === 201 && body.generation) {
       renderCanvas(body.generation);
-      renderQuota(body.quota);
       prependGeneration(body.generation);
       state.generations.unshift(body.generation);
       clearReference();
+      noteRemaining(body.credits);
       toast(t("studio_done_toast"));
       return;
     }
@@ -348,18 +377,24 @@
       setTimeout(function () { window.location.href = config.loginUrl; }, 900);
       return;
     }
-    if (code === "quota_exceeded") {
-      renderQuota(body.quota);
+    if (code === "insufficient_credits") {
       renderCanvas(null);
-      var message = t("studio_limit_" + (body.window || "day"), { n: body.limit });
-      var wait = formatDuration(body.retry_after_seconds);
-      if (wait) message += " " + t("studio_limit_reset", { d: wait });
-      showError(message);
+      showError(
+        t("studio_insufficient", { n: body.shortfall || 0 }),
+        null,
+        t("studio_insufficient_cta"),
+        "#studio-earn"
+      );
       return;
     }
     if (code === "invalid_prompt") {
       renderCanvas(null);
       showError(t("studio_prompt_required"));
+      return;
+    }
+    if (code === "invalid_image") {
+      renderCanvas(null);
+      showError(t("upload_bad_type"), body.error);
       return;
     }
 
@@ -392,6 +427,7 @@
 
       clearError();
       setBusy(true);
+      if (walletNoteEl) walletNoteEl.hidden = true;
       if (canvas) {
         canvas.textContent = "";
         canvas.appendChild(latentPlate(prompt));
@@ -425,7 +461,8 @@
     });
   }
 
-  /* Library: copy a prompt, or send one straight into the composer. */
+  /* ---------------- Library: copy or send into the composer ---------------- */
+
   document.addEventListener("click", function (event) {
     var copyBtn = event.target.closest("[data-studio-copy]");
     if (copyBtn) {
@@ -449,20 +486,100 @@
     }
   });
 
+  /* ---------------- Reward challenges ---------------- */
+
+  function markChallengeComplete(slug) {
+    var card = document.querySelector('[data-challenge="' + slug + '"]');
+    if (!card) return;
+    var foot = card.querySelector(".challenge-foot");
+    var button = foot && foot.querySelector("[data-challenge-claim]");
+    if (button) button.replaceWith(el("span", "challenge-done", t("studio_challenge_done")));
+  }
+
+  function claimChallenge(slug, evidence) {
+    var url = config.challengeEndpoint.replace("__slug__", slug);
+    return fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRFToken": getCookie("csrftoken"),
+      },
+      credentials: "same-origin",
+      body: JSON.stringify({ evidence: evidence }),
+    }).then(function (response) {
+      return response
+        .json()
+        .catch(function () { return {}; })
+        .then(function (body) { return { status: response.status, body: body }; });
+    });
+  }
+
+  document.addEventListener("click", function (event) {
+    var btn = event.target.closest("[data-challenge-claim]");
+    if (!btn) return;
+
+    var slug = btn.dataset.challengeClaim;
+    var card = btn.closest("[data-challenge]");
+    var needsEvidence = card && card.dataset.needsEvidence === "1";
+    var evidence = "";
+
+    if (needsEvidence) {
+      evidence = window.prompt(t("studio_challenge_evidence_prompt"), "");
+      if (!evidence) return;
+    }
+
+    btn.disabled = true;
+    claimChallenge(slug, evidence)
+      .then(function (result) {
+        if (result.body && result.body.credits) renderCredits(result.body.credits);
+        if (result.status === 201) {
+          markChallengeComplete(slug);
+          if (walletNoteEl) walletNoteEl.hidden = true;
+          toast(t("studio_challenge_done_toast", { n: result.body.reward || 0 }));
+        } else {
+          showError(t("studio_challenge_error"), result.body && result.body.error);
+          btn.disabled = false;
+        }
+      })
+      .catch(function () {
+        showError(t("studio_challenge_error"));
+        btn.disabled = false;
+      });
+  });
+
+  var referralCopy = document.getElementById("referral-copy");
+  var referralInput = document.getElementById("referral-url");
+  if (referralCopy && referralInput) {
+    referralCopy.addEventListener("click", function () {
+      copyText(referralInput.value).then(function () { toast(t("studio_referral_copied")); });
+    });
+  }
+
   /* i18n.js asks pages to re-apply their own strings after a language switch. */
   window.promptlyApplyPageI18n = function () {
-    renderQuota(state.quota);
+    renderCredits(state.credits);
     renderGenerations(state.generations);
     renderCanvas(state.generations[0] || null);
     if (submitBtn) {
-      var label = submitBtn.querySelector("span");
+      var label = submitBtn.querySelector("span[data-i18n]");
       if (label) label.textContent = t("studio_generate");
     }
   };
 
-  renderQuota(state.quota);
+  /* ---------------- Boot ---------------- */
+
+  renderCredits(state.credits);
   renderGenerations(state.generations);
   renderCanvas(state.generations[0] || null);
   updateCount();
-  if (submitBtn && !config.canGenerate) submitBtn.disabled = true;
+
+  // A post's "Use prompt" action lands here with the prompt already filled in
+  // and the source post remembered, so the result links back to it.
+  if (config.prefill && config.prefill.sourcePostId && promptEl) {
+    activeSource = parseInt(config.prefill.sourcePostId, 10) || null;
+    var label = config.prefill.sourceTitle || "";
+    if (config.prefill.sourceAuthor) label += " · @" + config.prefill.sourceAuthor;
+    if (refText && label) refText.textContent = label;
+    promptEl.focus();
+  }
 })();
