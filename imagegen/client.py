@@ -147,7 +147,7 @@ class ImageProvider:
         if not url.lower().startswith(("http://", "https://")):
             raise GenerationError("The provider returned an unusable image URL.")
 
-        request = urllib.request.Request(url, headers={"User-Agent": "Promptly/1.0"})
+        request = urllib.request.Request(url, headers={"User-Agent": "Promptya/1.0"})
         try:
             with urllib.request.urlopen(request, timeout=DOWNLOAD_TIMEOUT_SECONDS) as response:
                 declared = response.headers.get("Content-Length")

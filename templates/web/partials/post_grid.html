@@ -8,10 +8,13 @@ Expects: posts (list of serialized post dicts)
       <a class="post-card-media {% if post.image or post.video %}has-media{% else %}is-prompt{% endif %}"
          href="{% url 'web:post-detail' post.id %}">
         {% if post.image %}
-          <img src="{{ post.image }}" alt="{{ post.title }}" loading="lazy">
+          <img src="{{ post.image }}" alt="{{ post.title }}" loading="lazy" decoding="async">
         {% elif post.video %}
           <video src="{{ post.video }}" muted preload="metadata" playsinline></video>
-          <span class="media-badge">▶ {{ i18n.video }}</span>
+          <span class="media-badge">
+            <svg class="icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="m7 4 13 8-13 8z"/></svg>
+            {{ i18n.video }}
+          </span>
         {% elif post.audio %}
           {% comment %} A waveform reads as "audio" at a glance and avoids printing
           the title twice — the card body already carries it below. {% endcomment %}
@@ -36,13 +39,19 @@ Expects: posts (list of serialized post dicts)
                 <rect x="120" y="11" width="4" height="12" rx="2"/>
               </g>
             </svg>
-            <span class="media-badge">♪ {{ i18n.audio }}</span>
+            <span class="media-badge">
+              <svg class="icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg>
+              {{ i18n.audio }}
+            </span>
           </div>
         {% else %}
           <div class="prompt-preview">
             <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 7V5a1 1 0 0 1 1-1h2M17 4h2a1 1 0 0 1 1 1v2M20 17v2a1 1 0 0 1-1 1h-2M7 20H5a1 1 0 0 1-1-1v-2"/><path d="M8 12h8"/></svg>
             <p>{{ post.prompt|default:post.title|truncatechars:180 }}</p>
-            <span class="media-badge">{{ i18n.prompt }}</span>
+            <span class="media-badge">
+              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 7V5a1 1 0 0 1 1-1h2M17 4h2a1 1 0 0 1 1 1v2M20 17v2a1 1 0 0 1-1 1h-2M7 20H5a1 1 0 0 1-1-1v-2"/><path d="M8 12h8"/></svg>
+              {{ i18n.prompt }}
+            </span>
           </div>
         {% endif %}
       </a>
@@ -53,7 +62,7 @@ Expects: posts (list of serialized post dicts)
           <a class="creator" href="{% url 'web:profile' post.author.username %}">
             {% include "web/partials/avatar.html" with url=post.author.profile_picture name=post.author.display_name cls="creator-avatar" %}
             <span class="creator-name">@{{ post.author.username }}</span>
-            {% if post.author.is_verified %}<span class="verified" title="{{ i18n.verified }}">✔</span>{% endif %}
+            {% if post.author.is_verified %}{% include "web/partials/verified.html" with label=i18n.verified %}{% endif %}
           </a>
           <div class="stats">
             <button class="stat-btn like-btn {% if post.is_liked %}is-active{% endif %}"

@@ -1,11 +1,11 @@
-/* Promptly — AI studio.
+/* Promptya — AI studio.
    Renders four things from one source of truth: the credit wallet, the result
    canvas, the shelf of the user's own generations, and the reward challenges.
    The server seeds all of them as JSON, so nothing here duplicates a number. */
 (function () {
   "use strict";
 
-  var config = window.PROMPTLY_STUDIO;
+  var config = window.PROMPTYA_STUDIO;
   if (!config) return;
 
   var state = readSeed();
@@ -47,7 +47,7 @@
   }
 
   function t(key, params) {
-    return window.PromptlyI18n ? window.PromptlyI18n.t(key, params) : key;
+    return window.PromptyaI18n ? window.PromptyaI18n.t(key, params) : key;
   }
 
   function el(tag, className, text) {
@@ -556,7 +556,7 @@
   }
 
   /* i18n.js asks pages to re-apply their own strings after a language switch. */
-  window.promptlyApplyPageI18n = function () {
+  window.promptyaApplyPageI18n = function () {
     renderCredits(state.credits);
     renderGenerations(state.generations);
     renderCanvas(state.generations[0] || null);

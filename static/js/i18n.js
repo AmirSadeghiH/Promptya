@@ -1,4 +1,4 @@
-/* Promptly i18n — client-side English ⇄ Persian */
+/* Promptya i18n — client-side English ⇄ Persian */
 (function (global) {
   "use strict";
 
@@ -16,16 +16,16 @@
       trending: "Trending",
       saved: "Saved",
       categories: "Categories",
-      sidebar_tagline: "Promptly — built for prompt creators",
+      sidebar_tagline: "Promptya — built for prompt creators",
       notifications: "Notifications",
       profile: "Profile",
       for_you: "For You",
       latest: "Latest",
       following: "Following",
-      trending_now: "🔥 Trending now",
+      trending_now: "Trending now",
       popular_categories: "Popular categories",
       creators_to_follow: "Creators to follow",
-      just_added: "✨ Just added",
+      just_added: "Just added",
       posts: "posts",
       no_categories_yet: "No categories with posts yet.",
       no_creators_yet: "No creators yet.",
@@ -55,7 +55,7 @@
       follow: "Follow",
       following_btn: "Following",
       offline_title: "You're offline",
-      offline_body: "Promptly isn't available right now, but your cached pages still work. Check your connection and try again.",
+      offline_body: "Promptya isn't available right now, but your cached pages still work. Check your connection and try again.",
       try_again: "Try again",
       views: "views",
       prompt: "PROMPT",
@@ -103,6 +103,7 @@
       save_changes: "Save changes",
       saving: "Saving…",
       saved_check: "Saved ✓",
+      change_password: "Change password",
       current_password: "Current password",
       new_password: "New password",
       confirm_password: "Confirm new password",
@@ -255,16 +256,16 @@
       trending: "پرطرفدار",
       saved: "ذخیره‌شده",
       categories: "دسته‌بندی‌ها",
-      sidebar_tagline: "پرامپت‌لی — ساخته‌شده برای سازندگان پرامپت",
+      sidebar_tagline: "پرامپتیا — ساخته‌شده برای سازندگان پرامپت",
       notifications: "اعلان‌ها",
       profile: "پروفایل",
       for_you: "مخصوص شما",
       latest: "جدیدترین",
       following: "دنبال‌شده‌ها",
-      trending_now: "🔥 پرطرفدارترین‌ها",
+      trending_now: "پرطرفدارترین‌ها",
       popular_categories: "دسته‌بندی‌های محبوب",
       creators_to_follow: "سازندگان پیشنهادی",
-      just_added: "✨ تازه اضافه‌شده",
+      just_added: "تازه اضافه‌شده",
       posts: "پست",
       no_categories_yet: "هنوز دسته‌بندی‌ای با پست وجود ندارد.",
       no_creators_yet: "هنوز سازنده‌ای وجود ندارد.",
@@ -294,7 +295,7 @@
       follow: "دنبال کردن",
       following_btn: "دنبال می‌کنید",
       offline_title: "شما آفلاین هستید",
-      offline_body: "پرامپت‌لی در دسترس نیست، اما صفحه‌های ذخیره‌شده کار می‌کنند. اتصال خود را بررسی و دوباره تلاش کنید.",
+      offline_body: "پرامپتیا در دسترس نیست، اما صفحه‌های ذخیره‌شده کار می‌کنند. اتصال خود را بررسی و دوباره تلاش کنید.",
       try_again: "تلاش دوباره",
       views: "بازدید",
       prompt: "پرامپت",
@@ -342,6 +343,7 @@
       save_changes: "ذخیره تغییرات",
       saving: "در حال ذخیره…",
       saved_check: "ذخیره شد ✓",
+      change_password: "تغییر گذرواژه",
       current_password: "گذرواژه فعلی",
       new_password: "گذرواژه جدید",
       confirm_password: "تکرار گذرواژه جدید",
@@ -483,11 +485,11 @@
     },
   };
 
-  var LANG_KEY = "promptly-lang";
+  var LANG_KEY = "promptya-lang";
 
   function readLang() {
     // Server renders pages from the cookie; trust it first, then localStorage.
-    if (global.PROMPTLY_LANG === "fa" || global.PROMPTLY_LANG === "en") return global.PROMPTLY_LANG;
+    if (global.PROMPTYA_LANG === "fa" || global.PROMPTYA_LANG === "en") return global.PROMPTYA_LANG;
     try {
       var stored = localStorage.getItem(LANG_KEY);
       if (stored === "en" || stored === "fa") return stored;
@@ -530,7 +532,7 @@
     if (searchInput) searchInput.placeholder = t("search_placeholder");
 
     // The theme switch labels itself from theme.js (it names the *action*,
-    // not the concept), and re-labels on the promptly:langchange event.
+    // not the concept), and re-labels on the promptya:langchange event.
 
     // Every language toggle: topbar, drawer and footer all share the class.
     document.querySelectorAll(".js-lang-toggle").forEach(function (btn) {
@@ -544,8 +546,8 @@
     currentLang = (lang === "fa" || lang === "en") ? lang : (currentLang === "fa" ? "en" : "fa");
     persist(currentLang);
     applyStatic();
-    if (typeof global.promptlyApplyPageI18n === "function") global.promptlyApplyPageI18n();
-    window.dispatchEvent(new CustomEvent("promptly:langchange", { detail: { lang: currentLang } }));
+    if (typeof global.promptyaApplyPageI18n === "function") global.promptyaApplyPageI18n();
+    window.dispatchEvent(new CustomEvent("promptya:langchange", { detail: { lang: currentLang } }));
     // Chrome text above is translated client-side, but every server-rendered
     // string (post titles, categories, follow buttons, dates) exists only in
     // the page's render language. Reload so Django re-renders the whole page;
@@ -570,14 +572,14 @@
     },
   };
 
-  global.PromptlyI18n = api;
+  global.PromptyaI18n = api;
 
   document.addEventListener("DOMContentLoaded", function () {
     api.init();
     // Deferred page scripts run *before* DOMContentLoaded, so anything they
     // painted with t() used the pre-init language. Let the page redraw itself
     // now that the language is known — the same hook the switch uses.
-    if (typeof global.promptlyApplyPageI18n === "function") global.promptlyApplyPageI18n();
+    if (typeof global.promptyaApplyPageI18n === "function") global.promptyaApplyPageI18n();
     document.querySelectorAll(".js-lang-toggle").forEach(function (btn) {
       btn.addEventListener("click", function () { api.toggle(); });
     });

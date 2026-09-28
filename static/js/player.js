@@ -1,4 +1,4 @@
-/* Promptly media player — the platform's own video & audio player.
+/* Promptya media player — the platform's own video & audio player.
    The browser's native chrome is never shown: every control, the scrubber,
    the buffered range, the volume, the speed menu and fullscreen are ours.
 
@@ -43,7 +43,7 @@
   };
 
   function t(key) {
-    var i18n = global.PromptlyI18n;
+    var i18n = global.PromptyaI18n;
     if (i18n) {
       var value = i18n.t(key);
       if (value && value !== key) return value;
@@ -95,7 +95,7 @@
   }
 
   /* ---------------------------------------------------------------- volume */
-  var VOL_KEY = "promptly-volume";
+  var VOL_KEY = "promptya-volume";
 
   function readVolume() {
     try {
@@ -418,7 +418,7 @@
       if (fsBtn) fsBtn.setAttribute("title", t("player_fullscreen"));
       if (pipBtn) pipBtn.setAttribute("aria-label", t("player_pip"));
     }
-    global.addEventListener("promptly:langchange", refreshLabels);
+    global.addEventListener("promptya:langchange", refreshLabels);
 
     /* ---------- initial state ---------- */
     markPlaying(!media.paused);
@@ -567,5 +567,5 @@
     init();
   }
 
-  global.PromptlyPlayer = { init: init };
+  global.PromptyaPlayer = { init: init };
 })(window);

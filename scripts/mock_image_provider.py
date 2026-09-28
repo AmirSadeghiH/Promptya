@@ -61,7 +61,7 @@ def _render(prompt, seed):
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "PromptlyMock/1.0"
+    server_version = "PromptyaMock/1.0"
 
     def log_message(self, fmt, *args):  # keep the console readable
         print("mock:", fmt % args)

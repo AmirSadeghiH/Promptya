@@ -1,4 +1,4 @@
-/* Promptly — responsive navigation drawer.
+/* Promptya — responsive navigation drawer.
    Makes the hamburger functional on tablet/mobile: animated off-canvas panel,
    scroll lock, focus trap, Escape-to-close, scrim click, and RTL-aware motion.
    Degrades to nothing on desktop, where the sidebar is always visible. */
@@ -116,5 +116,5 @@
   if (mq.addEventListener) mq.addEventListener("change", onResize);
   else if (mq.addListener) mq.addListener(onResize);
 
-  window.PromptlyNav = { open: open, close: close, isOpen: function () { return isOpen; } };
+  window.PromptyaNav = { open: open, close: close, isOpen: function () { return isOpen; } };
 })();

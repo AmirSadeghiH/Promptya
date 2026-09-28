@@ -1,4 +1,4 @@
-/* Promptly — create page: dynamic media fields per post type.
+/* Promptya — create page: dynamic media fields per post type.
    The upload zone is swapped when the type changes; the prompt textarea
    doubles as the text "preview" (required for prompt posts, optional
    elsewhere). Client-side presence checks mirror the server's rules. */
@@ -20,11 +20,11 @@
   var errorBox = document.getElementById("create-error");
 
   function zone(field) {
-    return field && field.promptlyUpload ? field.promptlyUpload : null;
+    return field && field.promptyaUpload ? field.promptyaUpload : null;
   }
 
   function t(key) {
-    return window.PromptlyI18n ? window.PromptlyI18n.t(key) : key;
+    return window.PromptyaI18n ? window.PromptyaI18n.t(key) : key;
   }
 
   function showError(messages) {
@@ -93,7 +93,7 @@
         return;
       }
       // Re-run client validation on submit (file may have been replaced).
-      var problem = window.PromptlyUpload.validate(input.files[0], type);
+      var problem = window.PromptyaUpload.validate(input.files[0], type);
       if (problem === "bad_type") {
         showError([t("upload_bad_type")]);
         return;

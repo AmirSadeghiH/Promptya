@@ -1,4 +1,4 @@
-/* Promptly — frontend app JS */
+/* Promptya — frontend app JS */
 (function () {
   "use strict";
 
@@ -32,7 +32,7 @@
 
   /* ---------------- i18n helper ---------------- */
   function t(key, params) {
-    return window.PromptlyI18n ? window.PromptlyI18n.t(key, params) : key;
+    return window.PromptyaI18n ? window.PromptyaI18n.t(key, params) : key;
   }
 
   /* ---------------- Like / Save toggles ---------------- */
@@ -150,7 +150,7 @@
         '<div class="comment-head"><span class="creator-name">@' +
         escapeHtml(c.user.username) +
         "</span><span>" +
-        '<span class="comment-time">' + new Date(c.created_at).toLocaleString(PromptlyI18n.dateLocale()) + "</span>" +
+        '<span class="comment-time">' + new Date(c.created_at).toLocaleString(PromptyaI18n.dateLocale()) + "</span>" +
         (window.IS_OWNER
           ? ' <button class="comment-delete" data-comment-id="' + c.id + '">' + t("delete") + '</button>'
           : "") +
@@ -321,6 +321,64 @@
     }, { rootMargin: "400px" });
     observer.observe(loadMore);
 
+    /* Infinite scroll appends cards client-side, so this builder has to
+       produce the *same* markup as partials/post_grid.html — otherwise page 2
+       of the feed stops looking like page 1. It previously did not: it reached
+       for "♥" and "🔖" emoji where the server renders SVG icons, skipped the
+       media-type badge, the verified mark and every aria-label, and forced
+       dir="ltr" on the creator link. Everything user-authored still goes in via
+       textContent; only the fixed icon shell is markup. */
+    const SVG = {
+      like: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M19 14c1.5-1.6 2-3.3 2-5a5 5 0 0 0-9.6-1.8A5 5 0 0 0 3 9c0 1.7.5 3.4 2 5l7 7z"/></svg>',
+      save: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M19 21 12 16 5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>',
+      play: '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="m7 4 13 8-13 8z"/></svg>',
+      music: '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg>',
+      frame: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 7V5a1 1 0 0 1 1-1h2M17 4h2a1 1 0 0 1 1 1v2M20 17v2a1 1 0 0 1-1 1h-2M7 20H5a1 1 0 0 1-1-1v-2"/><path d="M8 12h8"/></svg>',
+      sparkle: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3.5 13.9 9l5.6 1.9-5.6 2L12 18.5l-1.9-5.6L4.5 11 10.1 9z"/><path d="M18.5 3.5v3M20 5h-3"/></svg>',
+      verified: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" fill="currentColor"/><path d="m7.5 12.4 2.9 2.9 6-6.4" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    };
+
+    // Mirrors the waveform in partials/post_grid.html so audio previews match.
+    const WAVEFORM =
+      '<svg class="audio-wave" viewBox="0 0 128 34" preserveAspectRatio="none" aria-hidden="true">' +
+      '<g fill="currentColor">' +
+      [13, 9, 4, 11, 2, 14, 7, 12, 1, 10, 15, 5, 12, 8, 14, 11]
+        .map((y, i) => '<rect x="' + i * 8 + '" y="' + y + '" width="4" height="' + (34 - y * 2) + '" rx="2"/>')
+        .join("") +
+      "</g></svg>";
+
+    function svgEl(markup, cls) {
+      const holder = document.createElement("span");
+      holder.innerHTML = markup;
+      const node = holder.firstChild;
+      if (cls) node.setAttribute("class", cls);
+      return node;
+    }
+
+    function badge(markup, label) {
+      const el = document.createElement("span");
+      el.className = "media-badge";
+      el.appendChild(svgEl(markup, "icon"));
+      el.appendChild(document.createTextNode(" " + label));
+      return el;
+    }
+
+    function statButton(action, iconMarkup, postId, count, active) {
+      const btn = document.createElement("button");
+      btn.className = "stat-btn " + action + "-btn" + (active ? " is-active" : "");
+      btn.dataset.action = action;
+      btn.dataset.postId = postId;
+      const label = t(action === "like" ? "like_action" : "save_action");
+      btn.setAttribute("aria-label", label);
+      btn.setAttribute("title", label);
+      btn.appendChild(svgEl(iconMarkup, "icon"));
+      const value = document.createElement("span");
+      value.dataset.count = action;
+      value.textContent = count;
+      btn.appendChild(value);
+      return btn;
+    }
+
     function buildCard(post) {
       const article = document.createElement("article");
       article.className = "post-card";
@@ -329,11 +387,13 @@
       const media = document.createElement("a");
       media.className = "post-card-media " + (post.image || post.video ? "has-media" : "is-prompt");
       media.href = `/post/${post.id}/`;
+
       if (post.image) {
         const img = document.createElement("img");
         img.src = post.image;
         img.alt = post.title;
         img.loading = "lazy";
+        img.decoding = "async";
         media.appendChild(img);
       } else if (post.video) {
         const video = document.createElement("video");
@@ -342,13 +402,21 @@
         video.preload = "metadata";
         video.playsInline = true;
         media.appendChild(video);
+        media.appendChild(badge(SVG.play, t("video")));
+      } else if (post.audio) {
+        const preview = document.createElement("div");
+        preview.className = "prompt-preview audio-preview";
+        preview.appendChild(svgEl(WAVEFORM));
+        preview.appendChild(badge(SVG.music, t("audio")));
+        media.appendChild(preview);
       } else {
         const preview = document.createElement("div");
         preview.className = "prompt-preview";
+        preview.appendChild(svgEl(SVG.frame, "icon"));
         const p = document.createElement("p");
         p.textContent = (post.prompt || post.title).slice(0, 180);
-        p.style.unicodeBidi = "plaintext";
         preview.appendChild(p);
+        preview.appendChild(badge(SVG.frame, t("prompt")));
         media.appendChild(preview);
       }
 
@@ -365,19 +433,20 @@
       const creator = document.createElement("a");
       creator.className = "creator";
       creator.href = `/profile/${encodeURIComponent(post.author.username)}/`;
-      creator.setAttribute("dir", "ltr");
       creator.appendChild(buildAvatar(post.author, "creator-avatar"));
       const creatorName = document.createElement("span");
       creatorName.className = "creator-name";
       creatorName.textContent = "@" + post.author.username;
       creator.appendChild(creatorName);
+      if (post.author.is_verified) {
+        const tick = svgEl(SVG.verified);
+        tick.className = "verified";
+        creator.appendChild(tick);
+      }
       const stats = document.createElement("div");
       stats.className = "stats";
-      stats.innerHTML =
-        '<button class="stat-btn like-btn' + (post.is_liked ? " is-active" : "") +
-        '" data-action="like" data-post-id="' + post.id + '">♥ <span data-count="like">' + post.like_count + "</span></button>" +
-        '<button class="stat-btn save-btn' + (post.is_saved ? " is-active" : "") +
-        '" data-action="save" data-post-id="' + post.id + '">🔖 <span data-count="save">' + post.save_count + "</span></button>";
+      stats.appendChild(statButton("like", SVG.like, post.id, post.like_count, post.is_liked));
+      stats.appendChild(statButton("save", SVG.save, post.id, post.save_count, post.is_saved));
       meta.appendChild(creator);
       meta.appendChild(stats);
       body.appendChild(meta);
@@ -388,9 +457,10 @@
         use.className = "use-prompt-btn";
         use.href = "/studio/?source=" + post.id;
         use.title = t("studio_use_prompt_title");
-        use.innerHTML =
-          '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3.5 13.9 9l5.6 1.9-5.6 2L12 18.5l-1.9-5.6L4.5 11 10.1 9z"/><path d="M18.5 3.5v3M20 5h-3"/></svg><span></span>';
-        use.querySelector("span").textContent = t("studio_use_prompt");
+        use.appendChild(svgEl(SVG.sparkle, "icon"));
+        const label = document.createElement("span");
+        label.textContent = t("studio_use_prompt");
+        use.appendChild(label);
         body.appendChild(use);
       }
 

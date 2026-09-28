@@ -1,7 +1,7 @@
 {% extends "web/base.html" %}
 {% load web_extras %}
-{% block title %}Promptly — share and remix AI prompts{% endblock %}
-{% block description %}Discover AI prompts on Promptly: browse image, video and audio results, read the exact prompt behind each one, and remix it for your own projects.{% endblock %}
+{% block title %}Promptya — share and remix AI prompts{% endblock %}
+{% block description %}Discover AI prompts on Promptya: browse image, video and audio results, read the exact prompt behind each one, and remix it for your own projects.{% endblock %}
 {% block canonical %}<link rel="canonical" href="{{ request.scheme }}://{{ request.get_host }}{% url 'web:home' %}">{% endblock %}
 
 {% block content %}
@@ -32,12 +32,16 @@
             <div class="suggest-row" data-suggest-username="{{ suggested.username }}">
               <a class="suggest-user" href="{% url 'web:profile' suggested.username %}">
                 {% include "web/partials/avatar.html" with url=suggested.profile_picture name=suggested.display_name cls="avatar suggest-avatar" %}
+                {% comment %}
+                  The badge is a sibling of .creator-name, not a child: the name
+                  truncates with an ellipsis in dense rows, and a badge inside
+                  it would be the first thing clipped.
+                {% endcomment %}
                 <span class="creator-info">
-                  <span class="creator-name">
-                    {{ suggested.display_name }}
-                    {% if suggested.is_verified %}<span class="verified">✔</span>{% endif %}
+                  <span class="creator-name">{{ suggested.display_name }}</span>
+                  <span class="muted">
+                    {% if suggested.is_verified %}{% include "web/partials/verified.html" %} {% endif %}{{ i18n.post_count|fmt:suggested.post_count }}
                   </span>
-                  <span class="muted">{{ i18n.post_count|fmt:suggested.post_count }}</span>
                 </span>
               </a>
               <button class="btn btn-outline btn-sm follow-btn"

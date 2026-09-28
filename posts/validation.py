@@ -1,4 +1,4 @@
-"""Secure media upload validation for Promptly.
+"""Secure media upload validation for Promptya.
 
 Every uploaded file passes through three layers:
   1. Extension whitelist (fast reject)

@@ -1,16 +1,19 @@
 {
-  "name": "Promptly — AI Prompt Community",
-  "short_name": "Promptly",
-  "description": "Discover, save and share AI prompts, images and videos.",
-  "start_url": "/",
+  "id": "/",
+  "name": "Promptya — AI Prompt Community",
+  "short_name": "Promptya",
+  "description": "Discover, save and share AI prompts, images, videos and audio — and read the exact prompt behind every result.",
+  "start_url": "/?utm_source=pwa",
   "scope": "/",
   "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
   "orientation": "portrait",
   "background_color": "#0a0a0f",
   "theme_color": "#0a0a0f",
   "lang": "en",
   "dir": "ltr",
-  "categories": ["social", "productivity"],
+  "categories": ["social", "productivity", "graphics"],
+  "prefer_related_applications": false,
   "icons": [
     {
       "src": "/static/icons/icon-192.png",
@@ -41,17 +44,34 @@
     {
       "name": "Explore",
       "url": "/explore/",
-      "description": "Discover trending prompts"
+      "description": "Discover trending prompts",
+      "icons": [
+        { "src": "/static/icons/icon-192.png", "sizes": "192x192", "type": "image/png" }
+      ]
     },
     {
       "name": "Create",
       "url": "/create/",
-      "description": "Share a new prompt"
+      "description": "Share a new prompt",
+      "icons": [
+        { "src": "/static/icons/icon-192.png", "sizes": "192x192", "type": "image/png" }
+      ]
+    },
+    {
+      "name": "AI Studio",
+      "url": "/studio/",
+      "description": "Generate an image from a prompt",
+      "icons": [
+        { "src": "/static/icons/icon-192.png", "sizes": "192x192", "type": "image/png" }
+      ]
     },
     {
       "name": "Saved",
       "url": "/saved/",
-      "description": "Your saved prompts"
+      "description": "Your saved prompts",
+      "icons": [
+        { "src": "/static/icons/icon-192.png", "sizes": "192x192", "type": "image/png" }
+      ]
     }
   ]
 }

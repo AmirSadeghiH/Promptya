@@ -1,4 +1,4 @@
-/* Promptly — custom media upload component.
+/* Promptya — custom media upload component.
    Replaces bare <input type=file> everywhere on the platform:
 
      <div data-upload='{"kind":"image"}'></div>
@@ -48,7 +48,7 @@
   };
 
   function t(key) {
-    return global.PromptlyI18n ? global.PromptlyI18n.t(key) : key;
+    return global.PromptyaI18n ? global.PromptyaI18n.t(key) : key;
   }
 
   function ext(name) {
@@ -190,7 +190,7 @@
         holder.appendChild(media);
         previewWrap.appendChild(holder);
         // Hand the fresh media element to the platform player.
-        if (global.PromptlyPlayer) global.PromptlyPlayer.init();
+        if (global.PromptyaPlayer) global.PromptyaPlayer.init();
       }
       previewWrap.hidden = false;
       frame.hidden = false;
@@ -253,7 +253,7 @@
     });
 
     // Expose for programmatic use (e.g. clearing on post-type switch).
-    container.promptlyUpload = { accept: accept, clear: function () { input.value = ""; clearPreview(); clearError(); } };
+    container.promptyaUpload = { accept: accept, clear: function () { input.value = ""; clearPreview(); clearError(); } };
   }
 
   function fmtFormats(kind) {
@@ -278,5 +278,5 @@
     initAll();
   }
 
-  global.PromptlyUpload = { init: initAll, validate: validate, RULES: RULES };
+  global.PromptyaUpload = { init: initAll, validate: validate, RULES: RULES };
 })(window);

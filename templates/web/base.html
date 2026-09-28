@@ -4,34 +4,56 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="color-scheme" content="dark light">
-  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f6f6f9">
-  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0a0a0f">
+  {% comment %}
+    One theme-color tag, not two media-scoped ones. The OS preference is only
+    the *default*: the toolbar colour has to follow the theme the visitor
+    actually chose, and a media-scoped pair is chosen by the OS, so a visitor
+    on a dark OS who picks light mode kept a near-black browser bar. The
+    pre-paint script below and theme.js both rewrite this one tag. `#0a0a0f`
+    is the correct value for a JS-less client, which always renders dark.
+  {% endcomment %}
+  <meta name="theme-color" content="#0a0a0f">
   <meta name="format-detection" content="telephone=no">
 
-  <title>{% block title %}Promptly — share and remix AI prompts{% endblock %}</title>
-  <meta name="description" content="{% block description %}Promptly is a social network for AI prompt creators. Browse, save and remix image, video and audio results — and read the exact prompt behind every one.{% endblock %}">
+  <title>{% block title %}Promptya — share and remix AI prompts{% endblock %}</title>
+  <meta name="description" content="{% block description %}Promptya is a social network for AI prompt creators. Browse, save and remix image, video and audio results — and read the exact prompt behind every one.{% endblock %}">
   {% block robots %}<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">{% endblock %}
   {% block canonical %}<link rel="canonical" href="{{ request.build_absolute_uri }}">{% endblock %}
 
-  <meta property="og:site_name" content="Promptly">
+  <meta property="og:site_name" content="Promptya">
   <meta property="og:locale" content="{% if lang == 'fa' %}fa_IR{% else %}en_US{% endif %}">
   <meta property="og:locale:alternate" content="{% if lang == 'fa' %}en_US{% else %}fa_IR{% endif %}">
   <meta property="og:type" content="{% block og_type %}website{% endblock %}">
-  <meta property="og:title" content="{% block og_title %}Promptly — share and remix AI prompts{% endblock %}">
+  <meta property="og:title" content="{% block og_title %}Promptya — share and remix AI prompts{% endblock %}">
   <meta property="og:description" content="{% block og_description %}A social network for AI prompt creators. Browse, save and remix image, video and audio prompts — and read the exact prompt behind every one.{% endblock %}">
   <meta property="og:url" content="{{ request.build_absolute_uri }}">
   <meta property="og:image" content="{% block og_image %}{{ request.scheme }}://{{ request.get_host }}{% static 'icons/icon-512.png' %}{% endblock %}">
-  <meta property="og:image:alt" content="{% block og_image_alt %}Promptly{% endblock %}">
+  <meta property="og:image:alt" content="{% block og_image_alt %}Promptya{% endblock %}">
   {% block og_image_dims %}<meta property="og:image:width" content="512">
-  <meta property="og:image:height" content="512">{% endblock %}
+  <meta property="og:image:height" content="512">
+  <meta property="og:image:type" content="image/png">{% endblock %}
   <meta name="twitter:card" content="{% block twitter_card %}summary_large_image{% endblock %}">
-  <meta name="twitter:title" content="{% block twitter_title %}Promptly — share and remix AI prompts{% endblock %}">
+  <meta name="twitter:title" content="{% block twitter_title %}Promptya — share and remix AI prompts{% endblock %}">
   <meta name="twitter:image" content="{% block twitter_image %}{{ request.scheme }}://{{ request.get_host }}{% static 'icons/icon-512.png' %}{% endblock %}">
 
+  {% comment %}
+    Icon stack, in the order browsers actually consume it. `favicon.ico` is the
+    purpose-built multi-resolution ICO (16→256) and is offered first for the
+    tab; the PNGs cover Chrome/Android home-screen installs; the 180px
+    apple-touch-icon is the size iOS asks for (it downsamples anything else,
+    blurring a 192). The maskable pair is referenced from the manifest, not
+    here — a tab icon is never masked.
+  {% endcomment %}
   <link rel="manifest" href="{% static 'manifest.webmanifest' %}">
-  <link rel="icon" href="{% static 'icons/icon-192.png' %}">
-  <link rel="apple-touch-icon" href="{% static 'icons/icon-192.png' %}">
-  <meta name="apple-mobile-web-app-title" content="Promptly">
+  <link rel="icon" href="{% static 'icons/favicon.ico' %}" sizes="any">
+  <link rel="icon" type="image/png" sizes="192x192" href="{% static 'icons/icon-192.png' %}">
+  <link rel="icon" type="image/png" sizes="512x512" href="{% static 'icons/icon-512.png' %}">
+  <link rel="apple-touch-icon" sizes="180x180" href="{% static 'icons/apple-touch-icon.png' %}">
+  <meta name="application-name" content="Promptya">
+  <meta name="apple-mobile-web-app-title" content="Promptya">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -43,19 +65,22 @@
   <link rel="stylesheet" href="{% static 'css/app.css' %}">
 
   <script>
-    /* Theme must be resolved before first paint — no flash of the wrong mode. */
+    /* Theme must be resolved before first paint — no flash of the wrong mode,
+       and no flash of the wrong browser-chrome colour either. */
     (function () {
       function cookieTheme() {
-        var m = document.cookie.match(/(?:^|;\s*)promptly-theme=(dark|light)(?:;|$)/);
+        var m = document.cookie.match(/(?:^|;\s*)promptya-theme=(dark|light)(?:;|$)/);
         return m ? m[1] : null;
       }
       var theme = null;
-      try { theme = localStorage.getItem("promptly-theme"); } catch (e) {}
+      try { theme = localStorage.getItem("promptya-theme"); } catch (e) {}
       theme = theme || cookieTheme();
       if (theme !== "dark" && theme !== "light") {
         theme = window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
       }
       document.documentElement.setAttribute("data-theme", theme);
+      var meta = document.querySelector('meta[name="theme-color"]');
+      if (meta) meta.setAttribute("content", theme === "light" ? "#f6f6f9" : "#0a0a0f");
     })();
   </script>
 
@@ -68,7 +93,7 @@
         "@type": "WebSite",
         "@id": "{{ request.scheme }}://{{ request.get_host }}/#website",
         "url": "{{ request.scheme }}://{{ request.get_host }}/",
-        "name": "Promptly",
+        "name": "Promptya",
         "description": "A social network for AI prompt creators — browse, save and remix prompts.",
         "inLanguage": ["en", "fa"],
         "potentialAction": {
@@ -104,8 +129,12 @@
     </button>
 
     <a class="logo" href="{% url 'web:home' %}">
-      <span class="logo-mark" aria-hidden="true">◆</span>
-      <span class="logo-text">Promptly</span>
+      {% comment %}The real brand mark, and the exact asset the installed PWA
+      uses — so the header, the tab and the home-screen icon are one identity.
+      It carries its own dark tile, so it reads on both themes.{% endcomment %}
+      <img class="logo-mark" src="{% static 'icons/icon-192.png' %}"
+           alt="" width="30" height="30" decoding="async">
+      <span class="logo-text">Promptya</span>
     </a>
 
     <form class="search" action="{% url 'web:search' %}" method="get" role="search">
@@ -148,8 +177,9 @@
   <aside id="nav-drawer" class="nav-drawer" aria-label="{{ i18n.primary_nav }}" aria-hidden="true">
     <div class="drawer-head">
       <span class="logo">
-        <span class="logo-mark" aria-hidden="true">◆</span>
-        <span class="logo-text">Promptly</span>
+        <img class="logo-mark" src="{% static 'icons/icon-192.png' %}"
+             alt="" width="30" height="30" decoding="async">
+        <span class="logo-text">Promptya</span>
       </span>
       <button class="drawer-close" id="menu-close" type="button" aria-label="{{ i18n.close_menu }}">
         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>
@@ -287,8 +317,8 @@
     <div class="footer-inner">
       <div class="footer-brand">
         <span class="logo">
-          <span class="logo-mark" aria-hidden="true">◆</span>
-          <span class="logo-text">Promptly</span>
+          <img class="logo-mark" src="{% static 'icons/icon-192.png' %}" alt="" width="28" height="28">
+          <span class="logo-text">Promptya</span>
         </span>
         <p class="footer-tagline" data-i18n="footer_tagline">{{ i18n.footer_tagline }}</p>
         <div class="footer-prefs">
@@ -334,7 +364,7 @@
     </div>
 
     <div class="footer-bottom">
-      <span>© {% now "Y" %} Promptly</span>
+      <span>© {% now "Y" %} Promptya</span>
       <span class="footer-dot" aria-hidden="true">·</span>
       <span data-i18n="footer_rights">{{ i18n.footer_rights }}</span>
     </div>
@@ -372,7 +402,7 @@
   </nav>
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <script>window.PROMPTLY_LANG = "{{ lang }}";</script>
+  <script>window.PROMPTYA_LANG = "{{ lang }}";</script>
   <script src="{% static 'js/i18n.js' %}" defer></script>
   <script src="{% static 'js/theme.js' %}" defer></script>
   <script src="{% static 'js/nav.js' %}" defer></script>

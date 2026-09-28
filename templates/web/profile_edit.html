@@ -1,13 +1,14 @@
 {% extends "web/base.html" %}
 {% load static web_extras %}
-{% block title %}{{ i18n.edit_profile }} · Promptly{% endblock %}
+{% block title %}{{ i18n.edit_profile }} · Promptya{% endblock %}
 {% block robots %}<meta name="robots" content="noindex, nofollow">{% endblock %}
 
 {% block content %}
 <div class="page-head profile-edit-head">
   <h1 class="page-title" data-i18n="edit_profile">{{ i18n.edit_profile }}</h1>
   <a class="btn btn-ghost btn-sm" href="{% url 'web:profile' user.username %}">
-    {{ i18n.view_profile }} ↗
+    <span data-i18n="view_profile">{{ i18n.view_profile }}</span>
+    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 4h6v6"/><path d="M20 4 10 14"/><path d="M18 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4"/></svg>
   </a>
 </div>
 
@@ -110,7 +111,7 @@
 {% endblock %}
 
 {% block scripts %}
-<script>window.PROMPTLY_PROFILE_USERNAME = "{{ user.username|escapejs }}";</script>
+<script>window.PROMPTYA_PROFILE_USERNAME = "{{ user.username|escapejs }}";</script>
 <script src="{% static 'js/upload.js' %}" defer></script>
 <script src="{% static 'js/profile-edit.js' %}" defer></script>
 {% endblock %}

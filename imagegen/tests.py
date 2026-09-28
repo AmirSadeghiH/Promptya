@@ -71,7 +71,7 @@ class MediaTestCase(TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls._media_root = tempfile.mkdtemp(prefix="promptly-test-media-")
+        cls._media_root = tempfile.mkdtemp(prefix="promptya-test-media-")
         cls._media_override = override_settings(MEDIA_ROOT=cls._media_root)
         cls._media_override.enable()
         super().setUpClass()

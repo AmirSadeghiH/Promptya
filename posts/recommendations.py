@@ -1,4 +1,4 @@
-"""Recommendation engine for the Promptly home feed.
+"""Recommendation engine for the Promptya home feed.
 
 Personalized "For You" ranking, inspired by Instagram's approach but kept
 database-friendly (a handful of small aggregate queries, no heavy ML):

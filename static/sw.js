@@ -1,5 +1,5 @@
-/* Promptly service worker — offline shell + smart caching */
-const VERSION = "promptly-v3-avatars-player";
+/* Promptya service worker — offline shell + smart caching */
+const VERSION = "promptya-v4-brand-icons";
 const STATIC_CACHE = `${VERSION}-static`;
 const PAGE_CACHE = `${VERSION}-pages`;
 const IMAGE_CACHE = `${VERSION}-images`;
@@ -9,8 +9,11 @@ const PRECACHE_URLS = [
   "/static/js/app.js",
   "/static/js/i18n.js",
   "/static/js/theme.js",
+  "/static/js/nav.js",
   "/static/js/player.js",
   "/static/icons/icon-192.png",
+  "/static/icons/icon-512.png",
+  "/static/icons/apple-touch-icon.png",
   "/static/manifest.webmanifest",
   "/offline/",
 ];

@@ -1,4 +1,4 @@
-/* Promptly — profile edit page logic */
+/* Promptya — profile edit page logic */
 (function () {
   "use strict";
 
@@ -18,7 +18,7 @@
   }
 
   function t(key) {
-    return window.PromptlyI18n ? window.PromptlyI18n.t(key) : key;
+    return window.PromptyaI18n ? window.PromptyaI18n.t(key) : key;
   }
 
   const form = document.getElementById("profile-edit-form");
@@ -57,8 +57,8 @@
       // Client-side mirror of the server's image rules (posts/validation.py):
       // extension whitelist, size cap, MIME sanity.
       const problem =
-        window.PromptlyUpload && window.PromptlyUpload.validate
-          ? window.PromptlyUpload.validate(file, "image")
+        window.PromptyaUpload && window.PromptyaUpload.validate
+          ? window.PromptyaUpload.validate(file, "image")
           : null;
       if (problem === "bad_type") {
         showAvatarError(t("invalid_image_type"));
@@ -91,14 +91,14 @@
       if (avatarImg) avatarImg.remove();
       if (avatarInput) avatarInput.value = "";
       const zone = document.getElementById("avatar-upload");
-      if (zone && zone.promptlyUpload) zone.promptlyUpload.clear();
+      if (zone && zone.promptyaUpload) zone.promptyaUpload.clear();
       if (!document.getElementById("avatar-img")) {
         const wrap = document.getElementById("avatar-preview");
         if (wrap) {
           const span = document.createElement("span");
           span.id = "avatar-fallback";
           const name = document.getElementById("id_display_name");
-          span.textContent = ((name && name.value) || window.PROMPTLY_PROFILE_USERNAME || "?")
+          span.textContent = ((name && name.value) || window.PROMPTYA_PROFILE_USERNAME || "?")
             .charAt(0)
             .toUpperCase();
           wrap.appendChild(span);
@@ -175,13 +175,13 @@
         const username = data.user && data.user.username;
         if (
           username &&
-          username !== window.PROMPTLY_PROFILE_USERNAME &&
+          username !== window.PROMPTYA_PROFILE_USERNAME &&
           !formData.get("profile_picture") &&
           formData.get("remove_picture") !== "1"
         ) {
           // Username changed — reflect it in the URL without losing state.
           window.history.replaceState(null, "", `/settings/profile/`);
-          window.PROMPTLY_PROFILE_USERNAME = username;
+          window.PROMPTYA_PROFILE_USERNAME = username;
         }
         return data;
       })

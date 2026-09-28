@@ -1,13 +1,16 @@
 {% extends "web/base.html" %}
 {% load web_extras %}
-{% block title %}{{ i18n.explore }} · Promptly{% endblock %}
-{% block description %}Explore trending AI prompts, popular categories and the creators to follow on Promptly.{% endblock %}
+{% block title %}{{ i18n.explore }} · Promptya{% endblock %}
+{% block description %}Explore trending AI prompts, popular categories and the creators to follow on Promptya.{% endblock %}
 
 {% block content %}
 <h1 class="page-title" data-i18n="explore">{{ i18n.explore }}</h1>
 
 <section class="section">
-  <h2 class="section-title" data-i18n="trending_now">{{ i18n.trending_now }}</h2>
+  <h2 class="section-title">
+    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M22 7 13.5 15.5 8.5 10.5 2 17"/><path d="M16 7h6v6"/></svg>
+    <span data-i18n="trending_now">{{ i18n.trending_now }}</span>
+  </h2>
   {% with posts=explore.trending next_cursor="" %}
     {% include "web/partials/post_grid.html" %}
   {% endwith %}
@@ -38,7 +41,7 @@
             <span class="creator-name">{{ creator.display_name }}</span>
             <span class="muted">{{ i18n.post_count|fmt:creator.post_count }}</span>
           </span>
-          {% if creator.is_verified %}<span class="verified">✔</span>{% endif %}
+          {% if creator.is_verified %}{% include "web/partials/verified.html" %}{% endif %}
         </a>
       {% empty %}
         <p class="muted" data-i18n="no_creators_yet">{{ i18n.no_creators_yet }}</p>
@@ -48,7 +51,10 @@
 </div>
 
 <section class="section">
-  <h2 class="section-title" data-i18n="just_added">{{ i18n.just_added }}</h2>
+  <h2 class="section-title">
+    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3.5 13.9 9l5.6 1.9-5.6 2L12 18.5l-1.9-5.6L4.5 11 10.1 9z"/><path d="M18.5 3.5v3M20 5h-3"/></svg>
+    <span data-i18n="just_added">{{ i18n.just_added }}</span>
+  </h2>
   {% with posts=explore.latest next_cursor="" %}
     {% include "web/partials/post_grid.html" %}
   {% endwith %}

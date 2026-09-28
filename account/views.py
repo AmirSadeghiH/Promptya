@@ -23,7 +23,7 @@ RESERVED_USERNAMES = {
     "admin", "administrator", "api", "root", "support", "help", "about",
     "login", "logout", "signup", "register", "settings", "explore", "search",
     "create", "saved", "notifications", "category", "categories", "post",
-    "posts", "feed", "profile", "offline", "static", "media", "promptly",
+    "posts", "feed", "profile", "offline", "static", "media", "promptya",
     "official", "staff", "mod", "moderator", "system", "null", "undefined",
 }
 

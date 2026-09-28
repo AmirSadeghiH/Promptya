@@ -63,12 +63,12 @@ def _viewer_followed_ids(viewer):
     The set is cached on the viewer instance so serializing a whole feed
     page performs a single Follow query instead of one per post.
     """
-    cached = getattr(viewer, "_promptly_followed_ids", None)
+    cached = getattr(viewer, "_promptya_followed_ids", None)
     if cached is None:
         cached = set(
             Follow.objects.filter(follower=viewer).values_list("following_id", flat=True)
         )
-        viewer._promptly_followed_ids = cached
+        viewer._promptya_followed_ids = cached
     return cached
 
 

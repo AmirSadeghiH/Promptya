@@ -1,11 +1,11 @@
-/* Promptly theme — dark ⇄ light with persistence and system preference.
+/* Promptya theme — dark ⇄ light with persistence and system preference.
    The switch itself is a sliding sun/moon drawn purely in CSS from
    html[data-theme]; this module owns state, persistence, the <meta
    theme-color> tags and the accessible labelling of every copy. */
 (function (global) {
   "use strict";
 
-  var THEME_KEY = "promptly-theme";
+  var THEME_KEY = "promptya-theme";
   var DARK_BG = "#0a0a0f";
   var LIGHT_BG = "#f6f6f9";
 
@@ -16,7 +16,7 @@
   };
 
   function label(key) {
-    var i18n = global.PromptlyI18n;
+    var i18n = global.PromptyaI18n;
     if (i18n) {
       var value = i18n.t(key);
       if (value && value !== key) return value;
@@ -34,7 +34,7 @@
   }
 
   function cookieTheme() {
-    var m = document.cookie.match(/(?:^|;\s*)promptly-theme=(dark|light)(?:;|$)/);
+    var m = document.cookie.match(/(?:^|;\s*)promptya-theme=(dark|light)(?:;|$)/);
     return m ? m[1] : null;
   }
 
@@ -49,15 +49,11 @@
   }
 
   function updateMeta(theme) {
-    // Two media-scoped tags exist; update whichever matches the live theme.
+    // One unscoped tag, so this always wins: the browser-chrome colour tracks
+    // the theme the visitor chose, which may be the opposite of their OS.
     var wanted = theme === "light" ? LIGHT_BG : DARK_BG;
     document.querySelectorAll('meta[name="theme-color"]').forEach(function (meta) {
-      var scoped = meta.getAttribute("media") || "";
-      var isLight = scoped.indexOf("light") !== -1;
-      var isDark = scoped.indexOf("dark") !== -1;
-      if ((isLight && theme === "light") || (isDark && theme === "dark") || (!isLight && !isDark)) {
-        meta.setAttribute("content", wanted);
-      }
+      if (meta.getAttribute("content") !== wanted) meta.setAttribute("content", wanted);
     });
   }
 
@@ -102,7 +98,7 @@
       });
 
       // Re-label after a language switch so the switch reads in the new locale.
-      global.addEventListener("promptly:langchange", syncToggles);
+      global.addEventListener("promptya:langchange", syncToggles);
 
       if (global.matchMedia) {
         var mq = global.matchMedia("(prefers-color-scheme: light)");
@@ -118,7 +114,7 @@
     get: currentTheme,
   };
 
-  global.PromptlyTheme = api;
+  global.PromptyaTheme = api;
 
   document.addEventListener("DOMContentLoaded", api.init);
 })(window);

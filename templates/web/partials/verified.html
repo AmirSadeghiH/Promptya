@@ -1,0 +1,22 @@
+{% comment %}
+Verified-creator badge — the single source of truth for this mark.
+
+It used to be a bare "✔" text glyph in every template, which rendered at a
+different weight, baseline and size on each platform's emoji font. This is a
+drawn badge instead: a solid accent disc with a knocked-out check, so it stays
+identical across platforms, themes and RTL.
+
+Param:
+  label — optional accessible label. Omit it where an adjacent heading already
+          names the creator (then the badge is decorative and aria-hidden).
+
+Sizing comes from the .verified class; it inherits `currentColor` so it picks up
+the accent in every context it appears in.
+{% endcomment %}
+<span class="verified" {% if label %}role="img" aria-label="{{ label }}" title="{{ label }}"{% else %}aria-hidden="true"{% endif %}>
+  <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+    <circle cx="12" cy="12" r="10" fill="currentColor"/>
+    <path d="m7.5 12.4 2.9 2.9 6-6.4" fill="none" stroke="var(--verified-check, #fff)"
+          stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>
+</span>
