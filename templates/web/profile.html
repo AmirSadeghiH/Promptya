@@ -1,13 +1,9 @@
 {% extends "web/base.html" %}
-{% load web_extras %}
-{% block title %}{{ profile_user.display_name|default:profile_user.username }} (@{{ profile_user.username }}) · Promptya{% endblock %}
-{% block description %}{% if profile_user.biography %}{{ profile_user.biography|striptags|truncatechars:155 }}{% else %}AI prompts by @{{ profile_user.username }} — {{ posts|length }} published on Promptya.{% endif %}{% endblock %}
-{% block og_type %}profile{% endblock %}
-{% block og_title %}{{ profile_user.display_name|default:profile_user.username }} (@{{ profile_user.username }}){% endblock %}
-{% block og_image %}{% if profile_user.profile_picture %}{{ profile_user.profile_picture.url }}{% else %}{{ block.super }}{% endif %}{% endblock %}
-{% block og_image_dims %}{% if not profile_user.profile_picture %}{{ block.super }}{% endif %}{% endblock %}
+{% load seo_tags web_extras %}
 
 {% block content %}
+{% if crumbs %}{% seo_breadcrumbs crumbs %}{% endif %}
+
 <section class="profile-head">
   {% include "web/partials/avatar.html" with url=profile_user.profile_picture name=profile_user.display_name cls="profile-avatar" %}
   {% if user.is_authenticated and user.username == profile_user.username %}
@@ -24,7 +20,7 @@
     <p class="muted" dir="auto">@{{ profile_user.username }}</p>
     {% if profile_user.biography %}<p class="profile-bio">{{ profile_user.biography }}</p>{% endif %}
     <div class="profile-stats">
-      <span><strong>{{ posts|length }}</strong> <span data-i18n="posts">{{ i18n.posts }}</span></span>
+      <span><strong>{{ post_count }}</strong> <span data-i18n="posts">{{ i18n.posts }}</span></span>
       <span><strong>{{ follower_count }}</strong> <span data-i18n="followers">{{ i18n.followers }}</span></span>
       <span><strong>{{ following_count }}</strong> <span data-i18n="following">{{ i18n.following }}</span></span>
       {% if profile_user.level %}<span class="chip">{{ i18n.level_n|fmt:profile_user.level }}</span>{% endif %}
@@ -38,5 +34,26 @@
   {% endif %}
 </section>
 
-{% with posts=posts %}{% include "web/partials/post_grid.html" %}{% endwith %}
+{% comment %}
+  A creator with no public posts still gets a real page (they are linked from
+  posts and from the follow button) but the view marks it noindex and the sitemap
+  omits it, so the site does not accumulate an index full of empty profiles.
+{% endcomment %}
+{% if not profile_user.is_indexable %}
+  <p class="muted">{{ seo_labels.profile_thin_note }}</p>
+{% endif %}
+
+{% if posts %}
+  <h2 class="section-title" data-i18n="posts">{{ i18n.posts }}</h2>
+  {% with posts=posts next_page=next_page next_cursor="" %}
+    {% include "web/partials/post_grid.html" %}
+  {% endwith %}
+{% else %}
+  <div class="empty-state">
+    <p>{{ seo_empty }}</p>
+    {% if user.is_authenticated %}<a class="btn btn-primary" href="{% url 'web:create' %}">{{ i18n.share_a_prompt }}</a>{% endif %}
+  </div>
+{% endif %}
 {% endblock %}
+
+{% block json_ld_extra %}{% seo_jsonld seo_jsonld_nodes breadcrumb_node %}{% endblock %}

@@ -1,22 +1,32 @@
 {% extends "web/base.html" %}
-{% block title %}{{ post.title }} · Promptya{% endblock %}
-{% block description %}{{ post.description|default:post.prompt|striptags|truncatechars:155 }}{% endblock %}
-{% block og_type %}article{% endblock %}
-{% block og_title %}{{ post.title }}{% endblock %}
-{% block og_description %}{{ post.description|default:post.prompt|striptags|truncatechars:200 }}{% endblock %}
-{# A post's own image beats the site icon; block.super keeps the fallback. #}
-{% block og_image %}{% if post.image %}{{ post.image }}{% else %}{{ block.super }}{% endif %}{% endblock %}
-{% block twitter_image %}{% if post.image %}{{ post.image }}{% else %}{{ block.super }}{% endif %}{% endblock %}
-{% block og_image_alt %}{{ post.title }}{% endblock %}
-{# Ratio is unknown for user uploads, so drop the fixed icon dimensions. #}
-{% block og_image_dims %}{% if not post.image %}{{ block.super }}{% endif %}{% endblock %}
-{% block twitter_title %}{{ post.title }}{% endblock %}
+{% load seo_tags web_extras %}
+{% comment %}
+  The blocks below are kept only so the social tags read naturally in one place;
+  they echo the view's own values. Each one falls back to `block.super` when the
+  post has nothing to add — a text-only post has no image, and emitting an empty
+  og:image is worse than falling back to the site icon.
+{% endcomment %}
+{% block og_type %}{{ og_type|default:'article' }}{% endblock %}
+{% block og_title %}{{ seo_title }}{% endblock %}
+{% block og_description %}{{ seo_description }}{% endblock %}
+{% block og_image %}{% if og_image %}{{ og_image }}{% else %}{{ block.super }}{% endif %}{% endblock %}
+{% block og_image_alt %}{{ og_image_alt }}{% endblock %}
+{% block og_image_dims %}{% if og_image_dims %}{{ block.super }}{% endif %}{% endblock %}
+{% block twitter_title %}{{ seo_title }}{% endblock %}
+{% block twitter_description %}{{ seo_description }}{% endblock %}
+{% block twitter_image %}{% if og_image %}{{ og_image }}{% else %}{{ block.super }}{% endif %}{% endblock %}
 
 {% block content %}
+{% if crumbs %}{% seo_breadcrumbs crumbs %}{% endif %}
+
 <article class="post-detail" data-post-id="{{ post.id }}">
   <div class="detail-media {% if post.image or post.video %}has-media{% else %}is-prompt{% endif %}">
     {% if post.image %}
-      <img src="{{ post.image }}" alt="{{ post.title }}">
+      {# The LCP candidate. Eager, high priority, never lazy-loaded, with the
+         intrinsic size so the media box is reserved before the bytes arrive. #}
+      <img src="{% if post.image_webp %}{{ post.image_webp }}{% else %}{{ post.image }}{% endif %}"
+           alt="{{ post.title }} — {{ post.author.display_name|default:post.author.username }}"
+           {% seo_image_attrs post.image_width post.image_height priority="lcp" %}>
     {% elif post.video %}
       <video src="{{ post.video }}" data-media-player playsinline preload="metadata"></video>
     {% elif post.audio %}
@@ -53,7 +63,7 @@
       {% endif %}
     </header>
 
-    <h1 class="detail-title">{{ post.title }}</h1>
+    <h1 class="detail-title">{{ seo_h1 }}</h1>
     {% if post.description %}<p class="detail-desc">{{ post.description }}</p>{% endif %}
 
     {% if post.prompt %}
@@ -74,16 +84,22 @@
     {% endif %}
     <p class="meta-line">
       <a class="chip" href="{% url 'web:category' post.category.slug %}">{{ post.category.name }}</a>
-      {% for tag in post.tags %}<span class="chip" dir="auto">#{{ tag.name }}</span>{% endfor %}
+      {% comment %}
+        Tags used to be inert <span>s — visible text with no crawlable
+        destination, so the site's tag dimension was invisible to crawlers even
+        though the data and the search filter already existed. They are now real
+        links to the tag hub.
+      {% endcomment %}
+      {% for tag in post.tags %}<a class="chip" href="{% url 'web:tag' tag.slug %}" rel="tag" dir="auto">#{{ tag.name }}</a>{% endfor %}
     </p>
 
     <div class="detail-actions">
       <button class="stat-btn like-btn {% if post.is_liked %}is-active{% endif %}" data-action="like" data-post-id="{{ post.id }}">
-        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 14c1.5-1.6 2-3.3 2-5a5 5 0 0 0-9.6-1.8A5 5 0 0 0 3 9c0 1.7.5 3.4 2 5l7 7z"/></svg>
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M19 14c1.5-1.6 2-3.3 2-5a5 5 0 0 0-9.6-1.8A5 5 0 0 0 3 9c0 1.7.5 3.4 2 5l7 7z"/></svg>
         <span data-count="like">{{ post.like_count }}</span>
       </button>
       <button class="stat-btn save-btn {% if post.is_saved %}is-active{% endif %}" data-action="save" data-post-id="{{ post.id }}">
-        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21 12 16 5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M19 21 12 16 5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
         <span data-count="save">{{ post.save_count }}</span>
       </button>
       <span class="stat-pill">{{ post.copy_count }} {{ i18n.copies }}</span>
@@ -115,6 +131,31 @@
       {% endif %}
     {% endif %}
 
+    {% comment %}
+      Contextual internal links. Every one of these is a plain <a> the server
+      rendered, so the post's neighbourhood is discoverable without JavaScript.
+    {% endcomment %}
+    <section class="detail-context">
+      <h2 class="section-title">{{ seo_labels.post_creator_heading }}</h2>
+      <p class="muted">
+        <a href="{% url 'web:profile' post.author.username %}">@{{ post.author.username }}</a>
+        {% if post.author.biography %}· {{ post.author.biography|truncatechars:140 }}{% endif %}
+      </p>
+      <p class="meta-line">
+        <a class="chip" href="{% url 'web:category' post.category.slug %}">{{ post.category.name }}</a>
+        {% for tag in post.tags %}<a class="chip" href="{% url 'web:tag' tag.slug %}" rel="tag" dir="auto">#{{ tag.name }}</a>{% endfor %}
+      </p>
+    </section>
+
+    {% if related_posts %}
+      <section class="section related" aria-labelledby="related-heading">
+        <h2 class="section-title" id="related-heading">{{ seo_labels.post_more_in_category|fmt:post.category.name }}</h2>
+        {% with posts=related_posts next_cursor="" %}
+          {% include "web/partials/post_grid.html" %}
+        {% endwith %}
+      </section>
+    {% endif %}
+
     <section class="comments" id="comments">
       <h2 class="section-title" data-i18n="comments_title">{{ i18n.comments_title }}</h2>
       {% if user.is_authenticated %}
@@ -125,33 +166,15 @@
       {% else %}
         <p class="muted"><a href="{% url 'login' %}">{{ i18n.login }}</a> {{ i18n.login_to_join }}</p>
       {% endif %}
+      {% comment %}
+        Comments load over fetch. They are user-generated and moderation-dependent,
+        so they are deliberately kept out of the indexable content above rather
+        than rendered server-side as an unbounded, unmoderated text surface.
+      {% endcomment %}
       <div class="comment-list" data-endpoint="{% url 'interactions:list-comments' post.id %}" data-loaded="false"></div>
     </section>
   </div>
 </article>
 {% endblock %}
 
-{% block json_ld_extra %}
-<script type="application/ld+json">
-{
-  "@context": "https://schema.org",
-  "@type": "CreativeWork",
-  "name": "{{ post.title|escapejs }}",
-  "url": "{{ request.build_absolute_uri }}",
-  "datePublished": "{{ post.created_at|date:'c' }}",
-  "inLanguage": "{{ lang }}",
-  {% if post.image %}"image": "{{ post.image }}",{% endif %}
-  {% if post.ai_model %}"about": "{{ post.ai_model|escapejs }}",{% endif %}
-  {% if post.prompt %}"text": "{{ post.prompt|truncatechars:1200|escapejs }}",{% endif %}
-  "creator": {
-    "@type": "Person",
-    "name": "{{ post.author.display_name|default:post.author.username|escapejs }}",
-    "url": "{{ request.scheme }}://{{ request.get_host }}{% url 'web:profile' post.author.username %}"
-  },
-  "interactionStatistic": [
-    {"@type": "InteractionCounter", "interactionType": "https://schema.org/LikeAction", "userInteractionCount": {{ post.like_count }}},
-    {"@type": "InteractionCounter", "interactionType": "https://schema.org/CommentAction", "userInteractionCount": {{ post.comment_count }}}
-  ]
-}
-</script>
-{% endblock %}
+{% block json_ld_extra %}{% seo_jsonld seo_jsonld_nodes breadcrumb_node %}{% endblock %}

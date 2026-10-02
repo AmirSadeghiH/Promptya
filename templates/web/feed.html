@@ -1,9 +1,13 @@
 {% extends "web/base.html" %}
-{% block title %}{{ feed_tab|default:i18n.home }} · Promptya{% endblock %}
-{# Feed variants are alternates of one another; let "For You" be the indexed entry. #}
-{% block robots %}<meta name="robots" content="noindex, follow">{% endblock %}
+{% load seo_tags %}
+{# /feed/<variant>/ — a personalised or duplicate view of home/explore, so it is
+   noindex (set by the view) and never in the sitemap. The H1 names the variant. #}
 
 {% block content %}
+{% if crumbs %}{% seo_breadcrumbs crumbs %}{% endif %}
+
+<h1 class="page-title">{{ seo_h1 }}</h1>
+
 <div class="feed-tabs">
   <a class="tab {% if feed_tab == 'foryou' %}active{% endif %}" href="{% url 'web:home' %}" data-i18n="for_you">{{ i18n.for_you }}</a>
   <a class="tab {% if feed_tab == 'latest' %}active{% endif %}" href="{% url 'web:feed' 'latest' %}" data-i18n="latest">{{ i18n.latest }}</a>

@@ -1,10 +1,12 @@
 {% extends "web/base.html" %}
-{% load web_extras %}
-{% block title %}Promptya — share and remix AI prompts{% endblock %}
-{% block description %}Discover AI prompts on Promptya: browse image, video and audio results, read the exact prompt behind each one, and remix it for your own projects.{% endblock %}
-{% block canonical %}<link rel="canonical" href="{{ request.scheme }}://{{ request.get_host }}{% url 'web:home' %}">{% endblock %}
+{% load seo_tags web_extras %}
+{# Every title, description, canonical and robots directive comes from the view. #}
 
 {% block content %}
+{% if crumbs %}{% seo_breadcrumbs crumbs %}{% endif %}
+
+<h1 class="page-title">{{ seo_h1 }}</h1>
+
 <div class="feed-tabs">
   <a class="tab {% if feed_tab == 'foryou' %}active{% endif %}" href="{% url 'web:home' %}" data-i18n="for_you">{{ i18n.for_you }}</a>
   <a class="tab {% if feed_tab == 'latest' %}active{% endif %}" href="{% url 'web:feed' 'latest' %}" data-i18n="latest">{{ i18n.latest }}</a>
@@ -26,7 +28,7 @@
   {% if suggested_users %}
     <aside class="home-suggestions">
       <div class="suggest-card">
-        <h3 class="suggest-title" data-i18n="suggested_for_you">{{ i18n.suggested_for_you }}</h3>
+        <h2 class="suggest-title" data-i18n="suggested_for_you">{{ i18n.suggested_for_you }}</h2>
         <div class="suggest-list">
           {% for suggested in suggested_users %}
             <div class="suggest-row" data-suggest-username="{{ suggested.username }}">
@@ -55,4 +57,23 @@
     </aside>
   {% endif %}
 </div>
+
+{% comment %}
+  The curated hubs below are the site's internal-link spine: from every home
+  page a crawler reaches Explore, the Studio and the categories without having
+  to execute a single line of JavaScript.
+{% endcomment %}
+<section class="section" aria-labelledby="home-hubs">
+  <h2 class="section-title" id="home-hubs" data-i18n="popular_categories">{{ i18n.popular_categories }}</h2>
+  <div class="chip-list">
+    {% for category in categories|slice:":10" %}
+      <a class="chip" href="{% url 'web:category' category.slug %}">{{ category.name }}</a>
+    {% endfor %}
+  </div>
+  <p class="section-links">
+    <a class="btn btn-outline btn-sm" href="{% url 'web:explore' %}" data-i18n="explore">{{ i18n.explore }}</a>
+    <a class="btn btn-outline btn-sm" href="{% url 'web:studio' %}" data-i18n="studio">{{ i18n.studio }}</a>
+    <a class="btn btn-outline btn-sm" href="{% url 'web:feed' 'latest' %}" data-i18n="latest">{{ i18n.latest }}</a>
+  </p>
+</section>
 {% endblock %}

@@ -1,4 +1,4 @@
-{% load static %}{% load web_extras %}<!DOCTYPE html>
+{% load static %}{% load web_extras seo_tags %}<!DOCTYPE html>
 <html lang="{{ lang }}" dir="{{ dir }}" data-theme="dark">
 <head>
   <meta charset="UTF-8">
@@ -15,26 +15,59 @@
   <meta name="theme-color" content="#0a0a0f">
   <meta name="format-detection" content="telephone=no">
 
-  <title>{% block title %}Promptya — share and remix AI prompts{% endblock %}</title>
-  <meta name="description" content="{% block description %}Promptya is a social network for AI prompt creators. Browse, save and remix image, video and audio results — and read the exact prompt behind every one.{% endblock %}">
-  {% block robots %}<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">{% endblock %}
-  {% block canonical %}<link rel="canonical" href="{{ request.build_absolute_uri }}">{% endblock %}
+  {% comment %}
+    Titles, descriptions, the canonical and the robots directive are computed in
+    web/views.py::_meta_context and seo.py, not assembled here. That is what lets
+    web/test_seo.py assert on them directly instead of scraping rendered HTML, and
+    it is why every page below can only forget them by forgetting to pass the
+    context at all — the block defaults below still cover that.
+  {% endcomment %}
+  <title>{% block title %}{{ seo_title|default:"Promptya — free AI prompts to share, browse and remix" }}{% endblock %}</title>
+  <meta name="description" content="{% block description %}{{ seo_description|default:"Browse, save and remix AI image, video and audio results, and read the exact prompt behind every one." }}{% endblock %}">
+  {% block robots %}<meta name="robots" content="{{ robots_meta|default:'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1' }}">{% endblock %}
+  {% block canonical %}<link rel="canonical" href="{{ canonical_url|default:request.build_absolute_uri }}">{% endblock %}
+  {# Language alternates. Reciprocal by construction: every version of a page is built from the same neutral path and emits the same set. #}
+  {% block hreflang %}{% seo_hreflang %}{% endblock %}
 
   <meta property="og:site_name" content="Promptya">
   <meta property="og:locale" content="{% if lang == 'fa' %}fa_IR{% else %}en_US{% endif %}">
   <meta property="og:locale:alternate" content="{% if lang == 'fa' %}en_US{% else %}fa_IR{% endif %}">
-  <meta property="og:type" content="{% block og_type %}website{% endblock %}">
-  <meta property="og:title" content="{% block og_title %}Promptya — share and remix AI prompts{% endblock %}">
-  <meta property="og:description" content="{% block og_description %}A social network for AI prompt creators. Browse, save and remix image, video and audio prompts — and read the exact prompt behind every one.{% endblock %}">
-  <meta property="og:url" content="{{ request.build_absolute_uri }}">
-  <meta property="og:image" content="{% block og_image %}{{ request.scheme }}://{{ request.get_host }}{% static 'icons/icon-512.png' %}{% endblock %}">
-  <meta property="og:image:alt" content="{% block og_image_alt %}Promptya{% endblock %}">
-  {% block og_image_dims %}<meta property="og:image:width" content="512">
+  <meta property="og:type" content="{% block og_type %}{{ og_type|default:'website' }}{% endblock %}">
+  <meta property="og:title" content="{% block og_title %}{{ seo_title|default:'Promptya — free AI prompts' }}{% endblock %}">
+  <meta property="og:description" content="{% block og_description %}{{ seo_description|default:'Browse, save and remix AI prompts.' }}{% endblock %}">
+  {# og:url must be the canonical, not the raw request: /studio/?source=12 and /studio/ are one page. #}
+  <meta property="og:url" content="{{ canonical_url|default:request.build_absolute_uri }}">
+  {% comment %}
+    Social scrapers reject a relative og:image, and the old template emitted
+    {{ post.image }} — a bare /media/… path. abs_media turns it into an absolute
+    https URL and prefers the WebP derivative when one exists.
+<<<<<<< ours
+  {% endcomment %}
+  <meta property="og:image" content="{% block og_image %}{% if og_image %}{{ og_image }}{% else %}{% abs_media request %}{% static 'icons/icon-512.png' %}{% endif %}{% endblock %}">
+=======
+
+    A page with no image of its own falls back to default_og_image, which the view
+    resolves. It used to be written here as {% abs_media request %}{% static … %},
+    but no template tag can consume {% static %}'s output as an argument, so this
+    collapsed to abs_media(request) and rendered the request's repr as the path:
+    "https://host/<WSGIRequest: GET '/…'>/static/icons/icon-512.png". Every page
+    without its own og:image was shipping that.
+  {% endcomment %}
+  <meta property="og:image" content="{% block og_image %}{{ og_image|default:default_og_image }}{% endblock %}">
+>>>>>>> theirs
+  <meta property="og:image:alt" content="{% block og_image_alt %}{{ og_image_alt|default:'Promptya' }}{% endblock %}">
+  {% block og_image_dims %}{% if og_image_dims %}<meta property="og:image:width" content="512">
   <meta property="og:image:height" content="512">
-  <meta property="og:image:type" content="image/png">{% endblock %}
+  <meta property="og:image:type" content="image/png">{% endif %}{% endblock %}
   <meta name="twitter:card" content="{% block twitter_card %}summary_large_image{% endblock %}">
-  <meta name="twitter:title" content="{% block twitter_title %}Promptya — share and remix AI prompts{% endblock %}">
-  <meta name="twitter:image" content="{% block twitter_image %}{{ request.scheme }}://{{ request.get_host }}{% static 'icons/icon-512.png' %}{% endblock %}">
+  <meta name="twitter:title" content="{% block twitter_title %}{{ seo_title|default:'Promptya — free AI prompts' }}{% endblock %}">
+  <meta name="twitter:description" content="{% block twitter_description %}{{ seo_description|default:'Browse, save and remix AI prompts.' }}{% endblock %}">
+<<<<<<< ours
+  <meta name="twitter:image" content="{% block twitter_image %}{% if og_image %}{{ og_image }}{% else %}{% abs_media request %}{% static 'icons/icon-512.png' %}{% endif %}{% endblock %}">
+=======
+  <meta name="twitter:image" content="{% block twitter_image %}{{ og_image|default:default_og_image }}{% endblock %}">
+>>>>>>> theirs
+  <meta name="twitter:image:alt" content="{% block twitter_image_alt %}{{ og_image_alt|default:'Promptya' }}{% endblock %}">
 
   {% comment %}
     Icon stack, in the order browsers actually consume it. `favicon.ico` is the
@@ -84,33 +117,15 @@
     })();
   </script>
 
-  {% block json_ld %}
-  <script type="application/ld+json">
-  {
-    "@context": "https://schema.org",
-    "@graph": [
-      {
-        "@type": "WebSite",
-        "@id": "{{ request.scheme }}://{{ request.get_host }}/#website",
-        "url": "{{ request.scheme }}://{{ request.get_host }}/",
-        "name": "Promptya",
-        "description": "A social network for AI prompt creators — browse, save and remix prompts.",
-        "inLanguage": ["en", "fa"],
-        "potentialAction": {
-          "@type": "SearchAction",
-          "target": {
-            "@type": "EntryPoint",
-            "urlTemplate": "{{ request.scheme }}://{{ request.get_host }}{% url 'web:search' %}?q={search_term_string}"
-          },
-          "query-input": "required name=search_term_string"
-        }
-      }
-    ]
-  }
-  </script>
-  {% endblock %}
-  {% comment %} Pages append their own entities (Article, Person, BreadcrumbList)
-  here so the site-level WebSite graph above is never lost. {% endcomment %}
+  {% comment %}
+    One graph per document, not one script per concern. The old template emitted
+    a site-wide WebSite script here and let each page append a *separate*
+    ld+json document, so a post's CreativeWork could not reference the WebPage it
+    lived on by @id. {% seo_jsonld %} serialises the whole graph through
+    json.dumps, which also means a post title containing "</script>" cannot break
+    out of the element.
+  {% endcomment %}
+  {% block json_ld %}{% seo_jsonld site_website_node site_organization_node %}{% endblock %}
   {% block json_ld_extra %}{% endblock %}
   {% block head_extra %}{% endblock %}
 </head>

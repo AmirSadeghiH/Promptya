@@ -108,6 +108,13 @@ def serialize_post(post, *, viewer=None):
         "prompt": post.prompt,
         "ai_model": post.ai_model,
         "image": post.image.url if post.image else None,
+        # The WebP derivative and the intrinsic size, captured once at upload time
+        # (posts.signals). The client-side card builder in static/js/app.js reads
+        # them so an infinitely-scrolled card reserves its space and serves the
+        # smaller file, exactly as the server-rendered card does.
+        "image_webp": post.image_webp.url if post.image_webp else None,
+        "image_width": post.image_width,
+        "image_height": post.image_height,
         "video": post.video.url if post.video else None,
         "audio": post.audio.url if post.audio else None,
         "created_at": post.created_at.isoformat(),

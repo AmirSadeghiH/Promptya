@@ -3980,6 +3980,141 @@ html[dir="rtl"] select {
 
 
 /* ==========================================================================
+   25b  SEO surfaces (breadcrumbs, pagination, page intros)
+   --------------------------------------------------------------------------
+   These are not decoration. Each is a real internal link that a crawler and a
+   screen-reader user both navigate, so they get the same care as any other
+   navigation: visible focus, adequate hit area, and logical spacing that works
+   in both directions.
+   ========================================================================== */
+
+.breadcrumbs {
+  margin-bottom: var(--sp-4);
+}
+
+.breadcrumbs ol {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--fs-xs);
+  line-height: var(--lh-snug);
+  color: var(--text-muted);
+}
+
+/* Separators are generated, not in the markup: the breadcrumb template tag emits
+   only <li>s, so the crumb list stays free of decorative characters that would
+   otherwise be read aloud as content. */
+.breadcrumbs li + li::before {
+  content: "/";
+  margin-inline-end: var(--sp-2);
+  color: var(--text-muted);
+  opacity: 0.6;
+}
+
+:root[dir="rtl"] .breadcrumbs li + li::before {
+  content: "\\";
+}
+
+.breadcrumbs a {
+  color: var(--text-secondary);
+  text-decoration: none;
+}
+
+.breadcrumbs a:hover {
+  color: var(--text);
+  text-decoration: underline;
+}
+
+.breadcrumbs .is-current {
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* The current crumb is a label, not a destination. Dropping the underline on
+   hover keeps it from reading like a link the reader cannot follow. */
+.breadcrumbs .is-current:hover {
+  text-decoration: none;
+}
+
+.page-intro {
+  max-width: 62ch;
+  margin-bottom: var(--sp-6);
+  font-size: var(--fs-md);
+}
+
+.listing-count {
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.section-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  margin-top: var(--sp-4);
+}
+
+.section-links a {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--sp-1) var(--sp-3);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: var(--fs-xs);
+  color: var(--text-secondary);
+  text-decoration: none;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.section-links a:hover {
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+/* Pagination is the crawl path through a deep listing, so the "next page" control
+   is a real <a>, not a JS handler — without it a non-JS crawler sees page 1 of
+   every listing forever. These are the offset-paginated surfaces (category, tag,
+   profile); the cursor-paginated home/feeds carry a .load-more sentinel instead,
+   because a cursor has no URL to point a crawler at. */
+.pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  margin-top: var(--sp-7);
+}
+
+.pagination a,
+.pagination span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.25rem;
+  padding: 0 var(--sp-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-sm);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+  text-decoration: none;
+}
+
+.pagination a:hover {
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+.pagination-next {
+  padding-inline: var(--sp-5);
+}
+
+
+/* ==========================================================================
    26  Responsive
    --------------------------------------------------------------------------
    One breakpoint set, declared once:

@@ -181,12 +181,23 @@ def tag_list(request):
     tags = Tag.objects.all()
     if query:
         tags = tags.filter(Q(name__icontains=query))
-    tags = tags.annotate(post_count=Count("posts", filter=Q(posts__isnull=False)))
-    tags = tags.filter(post_count__gt=0).order_by("-post_count", "name")[:50]
+    # Annotated as `published_count`, not `post_count`: Tag.post_count is now a
+    # read-only property that backs Tag.is_indexable, and a queryset annotation
+    # may not shadow a model attribute. The JSON key is unchanged.
+    tags = (
+        tags.annotate(published_count=Count("posts", filter=Q(posts__isnull=False)))
+        .filter(published_count__gt=0)
+        .order_by("-published_count", "name")[:50]
+    )
     return JsonResponse(
         {
             "results": [
-                {"id": tag.id, "name": tag.name, "slug": tag.slug, "post_count": tag.post_count}
+                {
+                    "id": tag.id,
+                    "name": tag.name,
+                    "slug": tag.slug,
+                    "post_count": tag.published_count,
+                }
                 for tag in tags
             ]
         }

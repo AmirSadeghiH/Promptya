@@ -1,59 +1,77 @@
-{% comment %}
-Renders a masonry-style grid of post cards.
-Expects: posts (list of serialized post dicts)
+{% load seo_tags %}{% comment %}
+Renders a masonry-style grid of post cards, plus crawlable pagination.
+
+Expects:
+  posts       list of serialized post dicts
+  next_cursor optional cursor for the JS infinite scroll (enhancement only)
+
+The pagination block is the important part for crawlers. Infinite scroll alone
+means posts 13+ are only reachable by executing JavaScript, so a non-JS crawler
+saw page 1 of every listing forever. The <a> below is a real link to the next
+HTML page; the IntersectionObserver in app.js progressively enhances it and hides
+it once it is done.
 {% endcomment %}
 <div class="post-grid" data-masonry>
   {% for post in posts %}
+    {% comment %}
+      The first card is the LCP candidate on every listing, so it is fetched
+      eagerly at high priority. Every other image defers. Both get width/height
+      from the values captured at upload time, which is what stops the masonry
+      from reflowing as media arrives.
+    {% endcomment %}
     <article class="post-card" data-post-id="{{ post.id }}">
       <a class="post-card-media {% if post.image or post.video %}has-media{% else %}is-prompt{% endif %}"
-         href="{% url 'web:post-detail' post.id %}">
-        {% if post.image %}
-          <img src="{{ post.image }}" alt="{{ post.title }}" loading="lazy" decoding="async">
-        {% elif post.video %}
-          <video src="{{ post.video }}" muted preload="metadata" playsinline></video>
-          <span class="media-badge">
-            <svg class="icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="m7 4 13 8-13 8z"/></svg>
-            {{ i18n.video }}
-          </span>
-        {% elif post.audio %}
-          {% comment %} A waveform reads as "audio" at a glance and avoids printing
-          the title twice — the card body already carries it below. {% endcomment %}
-          <div class="prompt-preview audio-preview">
-            <svg class="audio-wave" viewBox="0 0 128 34" preserveAspectRatio="none" aria-hidden="true" focusable="false">
-              <g fill="currentColor">
-                <rect x="0" y="13" width="4" height="8" rx="2"/>
-                <rect x="8" y="9" width="4" height="16" rx="2"/>
-                <rect x="16" y="4" width="4" height="26" rx="2"/>
-                <rect x="24" y="11" width="4" height="12" rx="2"/>
-                <rect x="32" y="2" width="4" height="30" rx="2"/>
-                <rect x="40" y="14" width="4" height="6" rx="2"/>
-                <rect x="48" y="7" width="4" height="20" rx="2"/>
-                <rect x="56" y="12" width="4" height="10" rx="2"/>
-                <rect x="64" y="1" width="4" height="32" rx="2"/>
-                <rect x="72" y="10" width="4" height="14" rx="2"/>
-                <rect x="80" y="15" width="4" height="4" rx="2"/>
-                <rect x="88" y="5" width="4" height="24" rx="2"/>
-                <rect x="96" y="12" width="4" height="10" rx="2"/>
-                <rect x="104" y="8" width="4" height="18" rx="2"/>
-                <rect x="112" y="14" width="4" height="6" rx="2"/>
-                <rect x="120" y="11" width="4" height="12" rx="2"/>
-              </g>
-            </svg>
-            <span class="media-badge">
-              <svg class="icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg>
-              {{ i18n.audio }}
-            </span>
-          </div>
-        {% else %}
-          <div class="prompt-preview">
+         href="{% url 'web:post-detail' post.id %}"
+         aria-label="{{ post.title }}">
+         {% if post.image %}
+           <img src="{% if post.image_webp %}{{ post.image_webp }}{% else %}{{ post.image }}{% endif %}"
+                alt="{{ post.title }}"
+                {% seo_image_attrs post.image_width post.image_height priority=forloop.first %}>
+         {% elif post.video %}
+           <video src="{{ post.video }}" muted preload="metadata" playsinline></video>
+           <span class="media-badge">
+             <svg class="icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="m7 4 13 8-13 8z"/></svg>
+             {{ i18n.video }}
+           </span>
+         {% elif post.audio %}
+           {% comment %} A waveform reads as "audio" at a glance and avoids printing
+           the title twice — the card body already carries it below. {% endcomment %}
+           <div class="prompt-preview audio-preview">
+             <svg class="audio-wave" viewBox="0 0 128 34" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+               <g fill="currentColor">
+                 <rect x="0" y="13" width="4" height="8" rx="2"/>
+                 <rect x="8" y="9" width="4" height="16" rx="2"/>
+                 <rect x="16" y="4" width="4" height="26" rx="2"/>
+                 <rect x="24" y="11" width="4" height="12" rx="2"/>
+                 <rect x="32" y="2" width="4" height="30" rx="2"/>
+                 <rect x="40" y="14" width="4" height="6" rx="2"/>
+                 <rect x="48" y="7" width="4" height="20" rx="2"/>
+                 <rect x="56" y="12" width="4" height="10" rx="2"/>
+                 <rect x="64" y="1" width="4" height="32" rx="2"/>
+                 <rect x="72" y="10" width="4" height="14" rx="2"/>
+                 <rect x="80" y="15" width="4" height="4" rx="2"/>
+                 <rect x="88" y="5" width="4" height="24" rx="2"/>
+                 <rect x="96" y="12" width="4" height="10" rx="2"/>
+                 <rect x="104" y="8" width="4" height="18" rx="2"/>
+                 <rect x="112" y="14" width="4" height="6" rx="2"/>
+                 <rect x="120" y="11" width="4" height="12" rx="2"/>
+               </g>
+             </svg>
+             <span class="media-badge">
+               <svg class="icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg>
+               {{ i18n.audio }}
+             </span>
+           </div>
+         {% else %}
+           <div class="prompt-preview">
             <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 7V5a1 1 0 0 1 1-1h2M17 4h2a1 1 0 0 1 1 1v2M20 17v2a1 1 0 0 1-1 1h-2M7 20H5a1 1 0 0 1-1-1v-2"/><path d="M8 12h8"/></svg>
             <p>{{ post.prompt|default:post.title|truncatechars:180 }}</p>
             <span class="media-badge">
               <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 7V5a1 1 0 0 1 1-1h2M17 4h2a1 1 0 0 1 1 1v2M20 17v2a1 1 0 0 1-1 1h-2M7 20H5a1 1 0 0 1-1-1v-2"/><path d="M8 12h8"/></svg>
-              {{ i18n.prompt }}
-            </span>
-          </div>
-        {% endif %}
+               {{ i18n.prompt }}
+             </span>
+           </div>
+         {% endif %}
       </a>
 
       <div class="post-card-body">
@@ -94,4 +112,34 @@ Expects: posts (list of serialized post dicts)
     </div>
   {% endfor %}
 </div>
-{% if next_cursor %}<div class="load-more" data-next-cursor="{{ next_cursor }}"></div>{% endif %}
+
+{% if next_page %}
+  {% comment %}
+    A real anchor, not a JS handler: this is how a crawler reaches page 2+ of a
+<<<<<<< ours
+    category, tag, profile or listing. app.js hides the link once its own
+    infinite scroll has taken over.
+  {% endcomment %}
+  <nav class="pagination" aria-label="{{ seo_labels.pagination_label }}">
+    <a class="btn btn-outline btn-sm pagination-next" rel="next"
+       href="?page={{ next_page }}" data-next-cursor="{{ next_cursor|default:'' }}">
+=======
+    category, tag, profile or listing.
+
+    These surfaces are offset-paginated, so the cursor attribute is deliberately
+    empty — app.js only enhances a listing when .load-more is present, and the
+    two are mutually exclusive by design. Cursor-paginated surfaces (home, the
+    feeds) have no URL for a cursor to point at, so they get the .load-more
+    sentinel and infinite scroll instead; offset-paginated ones have a real page
+    URL, so they get the link. Rendering both everywhere was tried and is wrong:
+    on a cursor surface there is no page 2 address to link to.
+  {% endcomment %}
+  <nav class="pagination" aria-label="{{ seo_labels.pagination_label }}">
+    <a class="btn btn-outline btn-sm pagination-next" rel="next" href="?page={{ next_page }}">
+>>>>>>> theirs
+      {{ seo_labels.pagination_next }}
+    </a>
+  </nav>
+{% else %}
+  {% if next_cursor %}<div class="load-more" data-next-cursor="{{ next_cursor }}"></div>{% endif %}
+{% endif %}

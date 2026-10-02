@@ -6,7 +6,6 @@
 
 <h1 class="page-title">{{ seo_h1 }}</h1>
 <p class="muted page-intro">{{ seo_intro }}</p>
-{% if category.description %}<p class="page-description">{{ category.description }}</p>{% endif %}
 <p class="muted listing-count">{{ seo_labels.listing_count_fmt|fmt:post_count }}</p>
 
 {% if posts %}
@@ -19,19 +18,6 @@
     <a class="btn btn-outline" href="{% url 'web:explore' %}">{{ i18n.explore }}</a>
   </div>
 {% endif %}
-
-{% comment %}
-  Every category links back to the set of categories. With one category the
-  chain ends here, but with two it keeps a crawler moving between hubs instead of
-  dropping it back at the home page.
-{% endcomment %}
-<nav class="section-links" aria-label="{{ seo_labels.breadcrumb_categories }}">
-  {% for other in categories %}
-    {% if other.slug != category.slug %}
-      <a class="chip" href="{% url 'web:category' other.slug %}">{{ other.name }}</a>
-    {% endif %}
-  {% endfor %}
-</nav>
 {% endblock %}
 
 {% block json_ld_extra %}{% seo_jsonld collection_page_node breadcrumb_node %}{% endblock %}

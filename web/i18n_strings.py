@@ -450,6 +450,294 @@ FA = {
 
 STRINGS = {"en": EN, "fa": FA}
 
+# ---------------------------------------------------------------------------
+# SEO / page-content strings
+# ---------------------------------------------------------------------------
+# Everything a crawler reads that is *not* chrome: page titles, meta
+# descriptions, the H1 of each page, breadcrumb labels, related-content headings
+# and pagination text.  Kept apart from STRINGS because none of it is rewritten
+# client-side (the language switch reloads, so Django re-renders the page), and
+# because these are the strings that must exist in both languages for the two
+# indexes to be genuinely parallel.
+#
+# `{n}`, `{name}`, `{tag}`, `{title}`, `{author}`, `{username}`, `{count}`,
+# `{query}`, `{type}` are substituted by web_extras.fmt / web.seo.fmt_value.
+# Every entry has a Persian twin; web/test_seo.py asserts that.
+
+SEO_STRINGS = {
+    "en": {
+        "site_name": "Promptya",
+        "site_description": (
+            "Promptya is a bilingual community for AI prompt creators. Browse, "
+            "save and remix image, video and audio results, and read the exact "
+            "prompt behind every one."
+        ),
+        # Home
+        "home_title": "Promptya — Free AI Prompts to Share, Browse and Remix",
+        "home_description": (
+            "Discover free AI prompts on Promptya: browse image, video and audio "
+            "results, read the exact prompt behind each one, and remix it in the "
+            "built-in AI studio."
+        ),
+        "home_h1": "Discover AI prompts worth remixing",
+        # Explore
+        "explore_title": "Explore AI Prompts, Categories and Creators · Promptya",
+        "explore_description": (
+            "Explore trending AI prompts, popular categories and the AI creators "
+            "worth following on Promptya — Persian and English, image, video, "
+            "audio and text prompts."
+        ),
+        "explore_intro": (
+            "A starting point for finding prompts: what the community is using "
+            "right now, grouped by category and by creator."
+        ),
+        # AI Studio
+        "studio_title": "AI Image Generator & Free AI Studio · Promptya",
+        "studio_description": (
+            "Generate AI images free with Promptya's studio. Take a prompt from "
+            "the community library or write your own, then generate your version "
+            "with built-in credits."
+        ),
+        "studio_h1_note": "Free AI image generation, powered by the community prompt library.",
+        # Search (noindex, but still needs a real title and description)
+        "search_title": "Search AI Prompts · Promptya",
+        "search_description": (
+            "Search AI prompts by title, prompt text, tag, category, AI model or "
+            "creator across the Promptya community."
+        ),
+        "search_results_title_fmt": "Search results for “{query}” · Promptya",
+        # Category
+        "category_title_fmt": "{name} AI Prompts · Promptya",
+        "category_description_fmt": (
+            "Browse free {count} community AI prompts in the {name} category on "
+            "Promptya. Copy the exact prompt text, see the result it produced, "
+            "and remix it in the AI studio."
+        ),
+        "category_h1_fmt": "{name} AI prompts",
+        "category_intro_fmt": (
+            "Every public prompt published in {name}, newest first. Each one "
+            "shows the result and the exact prompt behind it."
+        ),
+        "category_empty": "No public prompts in this category yet.",
+        # Tag
+        "tag_title_fmt": "#{tag} AI Prompts and Examples · Promptya",
+        "tag_description_fmt": (
+            "Browse {count} free AI prompts tagged {tag} on Promptya — the "
+            "prompt text, the result it produced, and the model it was written for."
+        ),
+        "tag_h1_fmt": "#{tag} AI prompts",
+        "tag_intro_fmt": (
+            "Community prompts tagged {tag}. Each one shows the output it "
+            "produced and the exact prompt that generated it."
+        ),
+        "tag_empty": "No public prompts carry this tag yet.",
+        # Post
+        "post_title_fmt": "{title} — AI Prompt by @{author} · Promptya",
+        "post_title_prompt_fmt": "{title} — Free AI Prompt by @{author} · Promptya",
+        "post_description_fmt": "{text} Free AI prompt by @{author} on Promptya.",
+        "post_fallback_fmt": (
+            "A free {type} AI prompt by @{author} on Promptya, with the exact "
+            "prompt text and the result it produced."
+        ),
+        "post_type_prompt": "prompt",
+        "post_type_image": "image",
+        "post_type_video": "video",
+        "post_type_audio": "audio",
+        "post_about_heading": "About this prompt",
+        "post_related_heading": "Related prompts",
+        "post_more_in_category": "More in {name}",
+        "post_creator_heading": "Published by",
+        "post_tags_heading": "Tags",
+        "post_empty": "This prompt has no text or media yet.",
+        # Profile
+        "profile_title_fmt": "{name} (@{username}) — AI Prompts on Promptya",
+        "profile_description_fmt": (
+            "{count} AI prompts published by @{username} on Promptya. Follow "
+            "their latest image, video, audio and text prompts."
+        ),
+        "profile_h1_posts_fmt": "{count} AI prompts by @{username}",
+        "profile_empty": "This creator has not published any public prompts yet.",
+        "profile_thin_note": (
+            "This creator has no public prompts yet, so the page is kept out of "
+            "the search index until they publish."
+        ),
+        # Feed variants (noindex alternates of home/explore)
+        "feed_h1_fmt": "{tab} AI prompts",
+        # Private / utility pages
+        "login_title": "Log in · Promptya",
+        "signup_title": "Create your account · Promptya",
+        "create_title": "Share an AI prompt · Promptya",
+        "create_description": "Publish an AI prompt or an image, video or audio result to the Promptya community.",
+        "saved_title": "Saved prompts · Promptya",
+        "notifications_title": "Notifications · Promptya",
+        "profile_edit_title": "Edit your profile · Promptya",
+        "offline_title": "You're offline · Promptya",
+        # Breadcrumbs & navigation
+        "breadcrumb_home": "Home",
+        "breadcrumb_explore": "Explore",
+        "breadcrumb_categories": "Categories",
+        "breadcrumb_tag": "Tag",
+        "breadcrumb_profile": "Creator",
+        "breadcrumb_post": "Prompt",
+        "breadcrumb_label": "Breadcrumb",
+        "breadcrumb_current": "Current page",
+        # Pagination
+        "pagination_label": "Pagination",
+        "pagination_previous": "Previous",
+        "pagination_next": "Next",
+        "pagination_page_fmt": "Page {n}",
+        "pagination_current_fmt": "Page {n}, current page",
+        "load_more_fmt": "Load more prompts (page {n})",
+        "listing_count_fmt": "{count} prompts",
+        "see_all_fmt": "See all {count} prompts",
+        # Errors
+        "not_found_title": "Page not found · Promptya",
+        "not_found_body": "That page doesn't exist, or it was removed. Try the home page, explore the categories, or search the prompt library.",
+        "server_error_title": "Something went wrong · Promptya",
+        "server_error_body": "Promptya hit an unexpected error. Please try again in a moment.",
+        "error_go_home": "Go to the home page",
+        "error_explore": "Explore prompts",
+    },
+    "fa": {
+        "site_name": "پرامپتیا",
+        "site_description": (
+            "پرامپتیا یک جامعهٔ دوزبانه برای سازندگان پرامپت هوش مصنوعی است. "
+            "پرامپت‌ها و نتایج تصویری، ویدیویی و صوتی را ببینید، ذخیره کنید و "
+            "بازسازی کنید، و پشت هر نتیجه دقیقاً همان پرامپت اصلی را بخوانید."
+        ),
+        # Home
+        "home_title": "پرامپتیا — پرامپت‌های هوش مصنوعی رایگان برای اشتراک و بازسازی",
+        "home_description": (
+            "پرامپت‌های هوش مصنوعی رایگان را در پرامپتیا کشف کنید: نتایج تصویری، "
+            "ویدیویی و صوتی را ببینید، پرامپت دقیق پشت هر نتیجه را بخوانید و آن را "
+            "در استودیوی هوش مصنوعی برای خودتان بازسازی کنید."
+        ),
+        "home_h1": "کشف پرامپت‌های هوش مصنوعی که ارزش بازسازی دارند",
+        # Explore
+        "explore_title": "کاوش پرامپت‌ها، دسته‌بندی‌ها و سازندگان هوش مصنوعی · پرامپتیا",
+        "explore_description": (
+            "پرامپت‌های پرطرفدار، دسته‌بندی‌های محبوب و سازندگان قابل دنبال‌کردن "
+            "هوش مصنوعی را در پرامپتیا کاوش کنید — فارسی و انگلیسی، پرامپت‌های "
+            "تصویر، ویدیو، صدا و متن."
+        ),
+        "explore_intro": (
+            "نقطهٔ شروعی برای پیدا کردن پرامپت: آنچه جامعه همین حالا استفاده می‌کند، "
+            "گروه‌بندی‌شده بر اساس دسته‌بندی و سازنده."
+        ),
+        # AI Studio
+        "studio_title": "ساخت تصویر با هوش مصنوعی و استودیوی رایگان · پرامپتیا",
+        "studio_description": (
+            "با استودیوی پرامپتیا رایگان تصویر هوش مصنوعی بسازید. یک پرامپت از "
+            "کتابخانهٔ جامعه بردارید یا خودتان بنویسید و با اعتبار رایگان نسخهٔ "
+            "خودتان را بسازید."
+        ),
+        "studio_h1_note": "ساخت رایگان تصویر با هوش مصنوعی، بر پایهٔ کتابخانهٔ پرامپت‌های جامعه.",
+        # Search (noindex, but still needs a real title and description)
+        "search_title": "جستجوی پرامپت‌های هوش مصنوعی · پرامپتیا",
+        "search_description": (
+            "در پرامپت‌های هوش مصنوعی بر اساس عنوان، متن پرامپت، برچسب، دسته‌بندی، "
+            "مدل هوش مصنوعی یا سازنده در جامعهٔ پرامپتیا جستجو کنید."
+        ),
+        "search_results_title_fmt": "نتایج جستجو برای «{query}» · پرامپتیا",
+        # Category
+        "category_title_fmt": "پرامپت‌های {name} · پرامپتیا",
+        "category_description_fmt": (
+            "{count} پرامپت هوش مصنوعی رایگان از کاربران را در دسته‌بندی {name} در "
+            "پرامپتیا ببینید. متن دقیق پرامپت را بردارید، نتیجه‌ای که ساخته را ببینید "
+            "و آن را در استودیوی هوش مصنوعی بازسازی کنید."
+        ),
+        "category_h1_fmt": "پرامپت‌های {name}",
+        "category_intro_fmt": (
+            "همهٔ پرامپت‌های عمومی منتشرشده در {name}، از جدیدترین به قدیمی‌ترین. "
+            "هر مورد نتیجه و متن دقیق پرامپت پشت آن را نشان می‌دهد."
+        ),
+        "category_empty": "هنوز پرامپت عمومی در این دسته‌بندی نیست.",
+        # Tag
+        "tag_title_fmt": "پرامپت‌ها و نمونه‌های #{tag} · پرامپتیا",
+        "tag_description_fmt": (
+            "{count} پرامپت هوش مصنوعی رایگان با برچسب {tag} را در پرامپتیا ببینید — "
+            "متن پرامپت، نتیجه‌ای که ساخته و مدلی که برای آن نوشته شده است."
+        ),
+        "tag_h1_fmt": "پرامپت‌های #{tag}",
+        "tag_intro_fmt": (
+            "پرامپت‌های جامعه با برچسب {tag}. هر مورد خروجی‌ای که ساخته و متن دقیق "
+            "پرامپتی که آن را ساخته نشان می‌دهد."
+        ),
+        "tag_empty": "هنوز پرامپت عمومی با این برچسب نیست.",
+        # Post
+        "post_title_fmt": "{title} — پرامپت هوش مصنوعی از @{author} · پرامپتیا",
+        "post_title_prompt_fmt": "{title} — پرامپت هوش مصنوعی رایگان از @{author} · پرامپتیا",
+        "post_description_fmt": "{text} پرامپت هوش مصنوعی رایگان از @{author} در پرامپتیا.",
+        "post_fallback_fmt": (
+            "یک پرامپت هوش مصنوعی رایگان {type} از @{author} در پرامپتیا، همراه با متن "
+            "دقیق پرامپت و نتیجه‌ای که ساخته است."
+        ),
+        "post_type_prompt": "متنی",
+        "post_type_image": "تصویری",
+        "post_type_video": "ویدیویی",
+        "post_type_audio": "صوتی",
+        "post_about_heading": "دربارهٔ این پرامپت",
+        "post_related_heading": "پرامپت‌های مرتبط",
+        "post_more_in_category": "بیشتر در {name}",
+        "post_creator_heading": "منتشرکننده",
+        "post_tags_heading": "برچسب‌ها",
+        "post_empty": "این پرامپت هنوز متن یا رسانه‌ای ندارد.",
+        # Profile
+        "profile_title_fmt": "{name} (@{username}) — پرامپت‌های هوش مصنوعی در پرامپتیا",
+        "profile_description_fmt": (
+            "{count} پرامپت هوش مصنوعی منتشرشده توسط @{username} در پرامپتیا. جدیدترین "
+            "پرامپت‌های تصویری، ویدیویی، صوتی و متنی او را دنبال کنید."
+        ),
+        "profile_h1_posts_fmt": "{count} پرامپت هوش مصنوعی از @{username}",
+        "profile_empty": "این سازنده هنوز هیچ پرامپت عمومی منتشر نکرده است.",
+        "profile_thin_note": (
+            "این سازنده هنوز پرامپت عمومی ندارد، بنابراین صفحه تا زمان انتشار او از "
+            "نمایهٔ جستجو بیرون نگه داشته می‌شود."
+        ),
+        # Feed variants (noindex alternates of home/explore)
+        "feed_h1_fmt": "پرامپت‌های هوش مصنوعی {tab}",
+        # Private / utility pages
+        "login_title": "ورود · پرامپتیا",
+        "signup_title": "ساخت حساب · پرامپتیا",
+        "create_title": "اشتراک یک پرامپت هوش مصنوعی · پرامپتیا",
+        "create_description": "یک پرامپت هوش مصنوعی یا نتیجهٔ تصویری، ویدیویی یا صوتی را در جامعهٔ پرامپتیا منتشر کنید.",
+        "saved_title": "پرامپت‌های ذخیره‌شده · پرامپتیا",
+        "notifications_title": "اعلان‌ها · پرامپتیا",
+        "profile_edit_title": "ویرایش پروفایل · پرامپتیا",
+        "offline_title": "شما آفلاین هستید · پرامپتیا",
+        # Breadcrumbs & navigation
+        "breadcrumb_home": "خانه",
+        "breadcrumb_explore": "کاوش",
+        "breadcrumb_categories": "دسته‌بندی‌ها",
+        "breadcrumb_tag": "برچسب",
+        "breadcrumb_profile": "سازنده",
+        "breadcrumb_post": "پرامپت",
+        "breadcrumb_label": "مسیر صفحه",
+        "breadcrumb_current": "صفحهٔ جاری",
+        # Pagination
+        "pagination_label": "صفحه‌بندی",
+        "pagination_previous": "قبلی",
+        "pagination_next": "بعدی",
+        "pagination_page_fmt": "صفحهٔ {n}",
+        "pagination_current_fmt": "صفحهٔ {n}، صفحهٔ جاری",
+        "load_more_fmt": "بارگذاری پرامپت‌های بیشتر (صفحهٔ {n})",
+        "listing_count_fmt": "{count} پرامپت",
+        "see_all_fmt": "دیدن همهٔ {count} پرامپت",
+        # Errors
+        "not_found_title": "صفحه پیدا نشد · پرامپتیا",
+        "not_found_body": "این صفحه وجود ندارد یا حذف شده است. صفحهٔ خانه را ببینید، دسته‌بندی‌ها را کاوش کنید یا در کتابخانهٔ پرامپت‌ها جستجو کنید.",
+        "server_error_title": "خطایی رخ داد · پرامپتیا",
+        "server_error_body": "پرامپتیا با خطای غیرمنتظره‌ای روبه‌رو شد. لطفاً کمی بعد دوباره تلاش کنید.",
+        "error_go_home": "رفتن به صفحهٔ خانه",
+        "error_explore": "کاوش پرامپت‌ها",
+    },
+}
+
+#: Both dictionaries must always carry exactly the same keys; web/test_seo.py
+#: fails the build if one language drifts ahead of the other.
+SEO_LANGUAGES = tuple(SEO_STRINGS)
+
+
 # JS-side dynamic strings (toasts etc.) — kept client-only.
 JS_STRINGS = {
     "en": {

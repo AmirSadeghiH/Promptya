@@ -62,3 +62,26 @@ class CustomUser(AbstractUser):
 
     def __str__(self):
         return self.username
+
+    @property
+    def display_label(self):
+        return self.display_name or self.username
+
+    @property
+    def public_post_count(self):
+        """Posts a visitor can actually see.
+
+        ``web.views.profile_page`` renders at most ``PROFILE_POST_LIMIT`` of
+        them, so counting the rendered list produced a meta description that
+        claimed "24 posts" for a creator with three hundred.
+        """
+        return self.posts.count()
+
+    @property
+    def is_indexable(self):
+        """A profile with no public content is an empty page, not a result.
+
+        Such profiles stay reachable (they are linked from posts and from the
+        follow button) but are excluded from the index and from the sitemap.
+        """
+        return self.is_active and self.public_post_count > 0

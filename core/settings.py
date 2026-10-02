@@ -19,6 +19,19 @@ DEBUG = _env_bool("DJANGO_DEBUG", default=True)
 
 ALLOWED_HOSTS = [h for h in os.environ.get("DJANGO_ALLOWED_HOSTS", "").split(",") if h] or ["*"]
 
+# --- Canonical site identity -------------------------------------------------
+# Every absolute URL the site emits for search engines (canonical links,
+# hreflang, Open Graph, JSON-LD, robots.txt, the XML sitemap) is built from this
+# one value, never from the incoming Host header.  That makes canonical tags
+# impossible to poison through a spoofed Host, keeps http/www/host variants from
+# fragmenting the index, and guarantees the sitemap advertises one origin.
+#
+# Leave it empty in development: the helpers then fall back to the request so
+# `runserver` on 127.0.0.1 keeps working.  `web.checks.site_url_check` raises a
+# deployment error when DEBUG is off and this is still unset.  The test suite
+# supplies its own origin per-test class; see `web/test_seo.py`.
+SITE_URL = os.environ.get("PROMPTYA_SITE_URL", "").strip().rstrip("/")
+
 
 # Application definition
 
@@ -44,6 +57,12 @@ MIDDLEWARE = [
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'core.middleware.MediaRangeMiddleware',
     'core.middleware.ApiCompatMiddleware',
+    # 301s http/www/alternate-host requests onto SITE_URL before anything else
+    # can echo the Host header into a canonical, og:url or sitemap entry.
+    'web.middleware.CanonicalHostMiddleware',
+    # Must run before CommonMiddleware so the active language is known by the
+    # time URL resolution picks between the /en/ and /fa/ resolvers.
+    'web.middleware.LanguageMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -65,6 +84,7 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
                 'web.context_processors.ui_prefs',
+                'web.context_processors.seo_prefs',
             ],
         },
     },
@@ -105,7 +125,19 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/6.1/topics/i18n/
 
-LANGUAGE_CODE = 'en-us'
+LANGUAGE_CODE = 'en'
+
+# Order matters: the first entry is the default language, and therefore the
+# language the sitemap points x-default at and the one unprefixed URLs resolve
+# to.  Both are server-rendered; neither depends on JavaScript.
+LANGUAGES = [
+    ('en', 'English'),
+    ('fa', 'Persian / فارسی'),
+]
+
+# UI language only.  Server-rendered text comes from web.i18n_strings, so Django's
+# own catalogs are intentionally empty and no .po files ship with the project.
+LOCALE_PATHS = []
 
 TIME_ZONE = 'UTC'
 
@@ -120,6 +152,11 @@ USE_TZ = True
 STATIC_URL = 'static/'
 STATICFILES_DIRS = [BASE_DIR / 'static']
 STATIC_ROOT = BASE_DIR / 'staticfiles'
+
+# Public pages are mounted with an explicit trailing slash.  APPEND_SLASH turns a
+# slash-less request into a single 301 to the slashed form, which is what keeps
+# /post/1 and /post/1/ from being two crawlable addresses.
+APPEND_SLASH = True
 
 # User-uploaded media (images / videos attached to posts, profile pictures)
 MEDIA_URL = 'media/'
@@ -170,3 +207,6 @@ if not DEBUG:
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
     X_FRAME_OPTIONS = "DENY"
     SECURE_CONTENT_TYPE_NOSNIFF = True
+    # Keeps internal URLs carrying tracking-ish parameters (?source=, ?ref=)
+    # out of third-party Referer headers.
+    SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"

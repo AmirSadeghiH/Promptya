@@ -35,6 +35,23 @@
     return window.PromptyaI18n ? window.PromptyaI18n.t(key, params) : key;
   }
 
+  /* ---------------- Language-aware page paths ---------------- */
+  /* Every page URL is /en/… or /fa/…. Client-side code that builds a link has to
+     land on the same language version the reader is on: an unprefixed /post/12/
+     still resolves (the unprefixed paths are kept as aliases) but drops the
+     reader onto a page whose canonical points elsewhere, which is both a worse
+     experience and a weaker internal link. */
+  const LANG = window.PROMPTYA_LANG === "fa" ? "fa" : "en";
+  function pagePath(path) {
+    return "/" + LANG + (path.startsWith("/") ? path : "/" + path);
+  }
+  /* The same prefix stripped back off, for matching the current location against
+     known routes. */
+  function neutralPath(pathname) {
+    const stripped = pathname.replace(/^\/(en|fa)(?=\/|$)/, "");
+    return stripped || "/";
+  }
+
   /* ---------------- Like / Save toggles ---------------- */
   document.addEventListener("click", function (e) {
     const btn = e.target.closest("[data-action]");
@@ -280,7 +297,10 @@
   const grid = document.querySelector(".post-grid");
   const loadMore = document.querySelector(".load-more");
   if (grid && loadMore && loadMore.dataset.nextCursor) {
-    const feedPath = window.location.pathname;
+    /* Matched against the *neutral* path: with the site now served at /en/… and
+       /fa/…, comparing the raw location meant every prefixed feed fell through
+       to the trending endpoint and "For You" paged in trending results. */
+    const feedPath = neutralPath(window.location.pathname);
     let apiUrl;
     if (feedPath === "/") {
       apiUrl = "/api/posts/feed/recommended/";
@@ -327,7 +347,11 @@
        for "♥" and "🔖" emoji where the server renders SVG icons, skipped the
        media-type badge, the verified mark and every aria-label, and forced
        dir="ltr" on the creator link. Everything user-authored still goes in via
-       textContent; only the fixed icon shell is markup. */
+       textContent; only the fixed icon shell is markup.
+
+       It also has to match on the *link* targets: server-rendered cards point at
+       /en/post/12/, so cards built here have to point at the same address rather
+       than the unprefixed alias. */
     const SVG = {
       like: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M19 14c1.5-1.6 2-3.3 2-5a5 5 0 0 0-9.6-1.8A5 5 0 0 0 3 9c0 1.7.5 3.4 2 5l7 7z"/></svg>',
       save: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M19 21 12 16 5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>',
@@ -386,12 +410,22 @@
 
       const media = document.createElement("a");
       media.className = "post-card-media " + (post.image || post.video ? "has-media" : "is-prompt");
-      media.href = `/post/${post.id}/`;
+      media.href = pagePath(`/post/${post.id}/`);
+      // The card body already prints the title as its own link; naming it here
+      // too is what makes the media area a usable target for a screen reader.
+      media.setAttribute("aria-label", post.title);
 
       if (post.image) {
         const img = document.createElement("img");
-        img.src = post.image;
+        // Prefer the WebP derivative, exactly as the server-rendered card does.
+        img.src = post.image_webp || post.image;
         img.alt = post.title;
+        /* Cards appended by infinite scroll are never the LCP candidate — the
+           server-rendered ones above already are — so everything here defers.
+           The intrinsic size still matters: it is what stops the masonry from
+           reflowing as the image arrives. */
+        if (post.image_width) img.width = post.image_width;
+        if (post.image_height) img.height = post.image_height;
         img.loading = "lazy";
         img.decoding = "async";
         media.appendChild(img);
@@ -424,7 +458,7 @@
       body.className = "post-card-body";
       const title = document.createElement("a");
       title.className = "post-card-title";
-      title.href = `/post/${post.id}/`;
+      title.href = pagePath(`/post/${post.id}/`);
       title.textContent = post.title;
       body.appendChild(title);
 
@@ -432,7 +466,7 @@
       meta.className = "post-card-meta";
       const creator = document.createElement("a");
       creator.className = "creator";
-      creator.href = `/profile/${encodeURIComponent(post.author.username)}/`;
+      creator.href = pagePath(`/profile/${encodeURIComponent(post.author.username)}/`);
       creator.appendChild(buildAvatar(post.author, "creator-avatar"));
       const creatorName = document.createElement("span");
       creatorName.className = "creator-name";
@@ -455,7 +489,7 @@
       if (post.post_type === "image" && post.prompt) {
         const use = document.createElement("a");
         use.className = "use-prompt-btn";
-        use.href = "/studio/?source=" + post.id;
+        use.href = pagePath("/studio/?source=" + post.id);
         use.title = t("studio_use_prompt_title");
         use.appendChild(svgEl(SVG.sparkle, "icon"));
         const label = document.createElement("span");

@@ -1,15 +1,29 @@
 """Template filters for i18n string formatting."""
 
+import re
+
 from django import template
 
 register = template.Library()
 
+#: ``{n}``, ``{query}``, ``{count}``, ``{name}``, ``{tag}``, ``{title}``,
+#: ``{author}``, ``{username}``, ``{type}`` — every placeholder the UI and SEO
+#: string tables use.  Matched generically rather than listed one by one: a
+#: template that renders ``{count}`` through a filter that only knows ``{n}``
+#: fails silently, printing the literal placeholder to the reader.
+PLACEHOLDER = re.compile(r"\{[a-z_]+\}")
+
 
 @register.filter
 def fmt(value, args):
-    """Replace {query}/{n}-style placeholders in a UI string with a value."""
+    """Replace ``{placeholder}`` tokens in a UI string with a value.
+
+    Every placeholder is replaced, not just the first: SEO listing strings are
+    reused with different arguments across templates, and a filter that honoured
+    only ``{n}`` would leak ``{count}`` straight into a rendered page.
+    """
     text = str(value or "")
-    return text.replace("{query}", str(args)).replace("{n}", str(args))
+    return PLACEHOLDER.sub(lambda match: str(args), text)
 
 
 @register.filter

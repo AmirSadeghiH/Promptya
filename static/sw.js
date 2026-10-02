@@ -1,9 +1,13 @@
 /* Promptya service worker — offline shell + smart caching */
-const VERSION = "promptya-v4-brand-icons";
+const VERSION = "promptya-v5-bilingual-urls";
 const STATIC_CACHE = `${VERSION}-static`;
 const PAGE_CACHE = `${VERSION}-pages`;
 const IMAGE_CACHE = `${VERSION}-images`;
 
+/* Page routes are served at /en/… and /fa/…, and the unprefixed aliases still
+   resolve, so this stays on "/" deliberately: the installed app should open the
+   reader's own language without a redirect, and every link inside it is built
+   from the active language prefix. */
 const PRECACHE_URLS = [
   "/static/css/app.css",
   "/static/js/app.js",
@@ -47,8 +51,12 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(request.url);
 
   if (request.method !== "GET" || url.origin !== self.location.origin) return;
-  // Never cache admin or API traffic
+  /* Never cache admin or API traffic. */
   if (url.pathname.startsWith("/admin/") || url.pathname.startsWith("/api/")) return;
+  /* …and never the crawler documents. robots.txt is an instruction, not a page:
+     serving a stale copy means a policy change does not reach the crawlers it was
+     made for. The sitemap is the same argument, and both are tiny. */
+  if (url.pathname === "/robots.txt" || url.pathname.endsWith("/sitemap.xml")) return;
 
   // Static assets & media: cache-first (stale-while-revalidate)
   if (
