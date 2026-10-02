@@ -354,6 +354,7 @@ def item_list_node(request, items):
         return None
     return {
         "@type": "ItemList",
+        "@id": f"{canonical_url(request)}#itemlist",
         "itemListElement": [
             {
                 "@type": "ListItem",

@@ -116,14 +116,7 @@ it once it is done.
 {% if next_page %}
   {% comment %}
     A real anchor, not a JS handler: this is how a crawler reaches page 2+ of a
-<<<<<<< ours
-    category, tag, profile or listing. app.js hides the link once its own
-    infinite scroll has taken over.
-  {% endcomment %}
-  <nav class="pagination" aria-label="{{ seo_labels.pagination_label }}">
-    <a class="btn btn-outline btn-sm pagination-next" rel="next"
-       href="?page={{ next_page }}" data-next-cursor="{{ next_cursor|default:'' }}">
-=======
+
     category, tag, profile or listing.
 
     These surfaces are offset-paginated, so the cursor attribute is deliberately
@@ -136,7 +129,7 @@ it once it is done.
   {% endcomment %}
   <nav class="pagination" aria-label="{{ seo_labels.pagination_label }}">
     <a class="btn btn-outline btn-sm pagination-next" rel="next" href="?page={{ next_page }}">
->>>>>>> theirs
+
       {{ seo_labels.pagination_next }}
     </a>
   </nav>

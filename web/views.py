@@ -89,8 +89,7 @@ def _meta_context(request, *, title, description, robots=None, og_type="website"
         "og_image": og_image or "",
         "og_image_alt": og_image_alt or labels["site_name"],
         "og_image_dims": og_image_dims,
-<<<<<<< ours
-=======
+
         # The social card for a page with no image of its own. Resolved here
         # rather than in the template because it needs the request origin and
         # {% static %} output in the same expression, which no template tag can
@@ -100,7 +99,7 @@ def _meta_context(request, *, title, description, robots=None, og_type="website"
         # Scrapers reject that outright, so every page with no og:image of its
         # own was emitting a broken one.
         "default_og_image": seo.absolute_media_url(static("icons/icon-512.png"), request),
->>>>>>> theirs
+
         # Template-side SEO copy (breadcrumb labels, pagination text, the
         # "this profile is kept out of the index" note). One lookup per page
         # instead of a per-string language branch in every template.
@@ -554,7 +553,7 @@ def _post_jsonld(request, post, description):
         "author": {
             "@id": f"{seo.absolute_path(reverse('web:profile', args=[post.author.username]), request)}#person"
         },
-        "isPartOf": {"@id": f"{seo.absolute_path(reverse('web:post-detail', args=[post.pk]), request)}#creativework"},
+        "isPartOf": {"@id": f"{seo.canonical_url(request)}#webpage"},
     }
     if post.seo_image:
         work["image"] = seo.absolute_media_url(post.seo_image.url, request)

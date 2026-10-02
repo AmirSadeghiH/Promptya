@@ -28,6 +28,7 @@ from urllib.parse import urlsplit
 
 from django.contrib.sitemaps import Sitemap
 from django.db.models import Count, Max, Q
+from django.db.models.functions import Length, Trim
 from django.urls import reverse
 
 from account.models import CustomUser
@@ -109,21 +110,28 @@ class PromptyaSitemap(Sitemap):
 
 
 def _published_posts():
-    """Posts that clear the coarse part of ``Post.is_indexable`` in SQL.
+    """Posts satisfying the model's public indexability rule, in SQL.
 
-    The property is the authority (a caption plus media counts, a bare title does
-    not), but a property cannot be filtered in the database. This queryset keeps
-    the sitemap close to that rule without loading every row: it requires a
-    non-empty title and either text or media.  ``web/test_seo.py`` asserts that
-    every post in the sitemap is also ``is_indexable`` on the model.
+    Keep this predicate in lockstep with Post.is_indexable: a non-blank
+    title and either meaningful text (20+ characters in description or prompt)
+    or an actual uploaded media file. This prevents thin posts from entering
+    the sitemap even though their detail view correctly sends noindex.
     """
-    return Post.objects.filter(
-        ~Q(title=""),
-        Q(description="") | Q(prompt="") | Q(image="") | Q(video="") | Q(audio=""),
-    ).exclude(
-        Q(description="") & Q(prompt="") & Q(image="") & Q(video="") & Q(audio="")
+    return (
+        Post.objects.annotate(
+            seo_title=Trim("title"),
+            seo_description_length=Length("description"),
+            seo_prompt_length=Length("prompt"),
+        )
+        .filter(~Q(seo_title=""))
+        .filter(
+            Q(seo_description_length__gte=Post.MIN_MEANINGFUL_LENGTH)
+            | Q(seo_prompt_length__gte=Post.MIN_MEANINGFUL_LENGTH)
+            | (Q(image__isnull=False) & ~Q(image=""))
+            | (Q(video__isnull=False) & ~Q(video=""))
+            | (Q(audio__isnull=False) & ~Q(audio=""))
+        )
     )
-
 
 class PostSitemap(PromptyaSitemap):
     """Every public post worth a result."""

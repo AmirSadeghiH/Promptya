@@ -41,10 +41,7 @@
     Social scrapers reject a relative og:image, and the old template emitted
     {{ post.image }} — a bare /media/… path. abs_media turns it into an absolute
     https URL and prefers the WebP derivative when one exists.
-<<<<<<< ours
-  {% endcomment %}
-  <meta property="og:image" content="{% block og_image %}{% if og_image %}{{ og_image }}{% else %}{% abs_media request %}{% static 'icons/icon-512.png' %}{% endif %}{% endblock %}">
-=======
+
 
     A page with no image of its own falls back to default_og_image, which the view
     resolves. It used to be written here as {% abs_media request %}{% static … %},
@@ -54,7 +51,7 @@
     without its own og:image was shipping that.
   {% endcomment %}
   <meta property="og:image" content="{% block og_image %}{{ og_image|default:default_og_image }}{% endblock %}">
->>>>>>> theirs
+
   <meta property="og:image:alt" content="{% block og_image_alt %}{{ og_image_alt|default:'Promptya' }}{% endblock %}">
   {% block og_image_dims %}{% if og_image_dims %}<meta property="og:image:width" content="512">
   <meta property="og:image:height" content="512">
@@ -62,11 +59,9 @@
   <meta name="twitter:card" content="{% block twitter_card %}summary_large_image{% endblock %}">
   <meta name="twitter:title" content="{% block twitter_title %}{{ seo_title|default:'Promptya — free AI prompts' }}{% endblock %}">
   <meta name="twitter:description" content="{% block twitter_description %}{{ seo_description|default:'Browse, save and remix AI prompts.' }}{% endblock %}">
-<<<<<<< ours
-  <meta name="twitter:image" content="{% block twitter_image %}{% if og_image %}{{ og_image }}{% else %}{% abs_media request %}{% static 'icons/icon-512.png' %}{% endif %}{% endblock %}">
-=======
+
   <meta name="twitter:image" content="{% block twitter_image %}{{ og_image|default:default_og_image }}{% endblock %}">
->>>>>>> theirs
+
   <meta name="twitter:image:alt" content="{% block twitter_image_alt %}{{ og_image_alt|default:'Promptya' }}{% endblock %}">
 
   {% comment %}

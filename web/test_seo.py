@@ -346,8 +346,7 @@ class PaginationTests(SeoTestCase):
         html = self.get("/en/category/photography/")
         self.assertIn('href="?page=2"', html)
 
-<<<<<<< ours
-=======
+
     def test_an_offset_listing_offers_the_anchor_and_not_the_js_sentinel(self):
         # Category, tag and profile listings are offset-paginated: page 2 is a real
         # URL, so it gets a real <a> for a non-JS crawler. They deliberately carry
@@ -377,7 +376,7 @@ class PaginationTests(SeoTestCase):
         self.assertIn('href="?page=2"', html)
         self.assertNotIn("data-next-cursor", html)
 
->>>>>>> theirs
+
     def test_page_two_is_reachable(self):
         self._fill()
         self.assertIn("Filler", self.get("/en/category/photography/?page=2"))
@@ -519,6 +518,16 @@ class StructuredDataTests(SeoTestCase):
             items["itemListElement"][0]["url"], f"{ORIGIN}/en/post/{self.post.pk}/"
         )
 
+    def test_collection_item_list_has_a_stable_node_id(self):
+        html = self.get("/en/category/photography/")
+        items = _node(html, "ItemList")
+        self.assertEqual(items["@id"], f"{ORIGIN}/en/category/photography/#itemlist")
+
+    def test_creative_work_is_part_of_its_page_node(self):
+        html = self.get(f"/en/post/{self.post.pk}/")
+        work = _node(html, "CreativeWork")
+        self.assertEqual(work["isPartOf"], {"@id": f"{ORIGIN}/en/post/{self.post.pk}/#webpage"})
+
     def test_a_title_containing_a_script_tag_cannot_break_out_of_the_json(self):
         nasty = _post(self.author, self.category, "Ha </script><script>alert(1)</script>")
         html = self.get(f"/en/post/{nasty.pk}/")
@@ -566,8 +575,7 @@ class MetadataTests(SeoTestCase):
         image = _property(self.get(f"/en/post/{self.post.pk}/"), "og:image")
         self.assertTrue(image.startswith("https://"), image)
 
-<<<<<<< ours
-=======
+
     def test_the_fallback_social_image_is_a_real_url_on_every_page(self):
         # This post has no image, so it takes the site-icon fallback. That fallback
         # used to render as
@@ -599,7 +607,7 @@ class MetadataTests(SeoTestCase):
                     self.assertNotIn("<", value, f"{tag}={value!r}")
                     self.assertNotIn("WSGIRequest", value, f"{tag}={value!r}")
 
->>>>>>> theirs
+
     def test_og_url_is_the_canonical_not_the_raw_request(self):
         html = self.get("/en/studio/?source=1")
         self.assertEqual(_property(html, "og:url"), f"{ORIGIN}/en/studio/")
@@ -728,6 +736,16 @@ class SitemapTests(SeoTestCase):
 
     def test_it_omits_an_empty_category(self):
         self.assertNotIn(f"<loc>{ORIGIN}/en/category/empty/</loc>", self.xml())
+
+    def test_it_omits_a_post_with_only_short_text(self):
+        short = _post(
+            self.author,
+            self.category,
+            "Short text",
+            prompt="x" * (Post.MIN_MEANINGFUL_LENGTH - 1),
+        )
+        self.assertFalse(short.is_indexable)
+        self.assertNotIn(f"<loc>{ORIGIN}/en/post/{short.pk}/</loc>", self.xml())
 
     def test_it_omits_a_tag_below_the_depth_threshold(self):
         lonely = _tag("lonely")
