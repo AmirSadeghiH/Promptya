@@ -2,10 +2,13 @@
 
 import json
 
+from django.templatetags.static import static
+
 from web.i18n_strings import LANG_COOKIE, STRINGS
 from web.seo import (
     DEFAULT_LANGUAGE,
     LANGUAGES,
+    absolute_media_url,
     absolute_path,
     active_language,
     language_direction,
@@ -58,5 +61,6 @@ def seo_prefs(request):
         "site_website_node": website_node(request),
         "site_organization_node": organization_node(request),
         "site_origin": absolute_path("/", request),
+        "default_og_image": absolute_media_url(static("icons/icon-512.png"), request),
         "seo_labels": seo_strings(active_language(request)),
     }

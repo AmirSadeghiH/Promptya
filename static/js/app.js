@@ -269,7 +269,7 @@
         .then((r) => (r.ok ? r.json() : r.json().then(Promise.reject.bind(Promise))))
         .then((data) => {
           toast(t("published_toast"));
-          setTimeout(() => (window.location.href = `/post/${data.post.id}/`), 700);
+          setTimeout(() => (window.location.href = `/post/${encodeURIComponent(data.post.slug)}/`), 700);
         })
         .catch((err) => {
           if (errorBox) {
@@ -410,7 +410,7 @@
 
       const media = document.createElement("a");
       media.className = "post-card-media " + (post.image || post.video ? "has-media" : "is-prompt");
-      media.href = pagePath(`/post/${post.id}/`);
+      media.href = pagePath(`/post/${encodeURIComponent(post.slug)}/`);
       // The card body already prints the title as its own link; naming it here
       // too is what makes the media area a usable target for a screen reader.
       media.setAttribute("aria-label", post.title);
@@ -458,7 +458,7 @@
       body.className = "post-card-body";
       const title = document.createElement("a");
       title.className = "post-card-title";
-      title.href = pagePath(`/post/${post.id}/`);
+      title.href = pagePath(`/post/${encodeURIComponent(post.slug)}/`);
       title.textContent = post.title;
       body.appendChild(title);
 

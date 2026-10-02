@@ -21,10 +21,7 @@
 
 <article class="post-detail" data-post-id="{{ post.id }}">
   <div class="detail-media {% if post.image or post.video %}has-media{% else %}is-prompt{% endif %}">
-    {% if post.image %}
-      {# The LCP candidate. Eager, high priority, never lazy-loaded, with the
-         intrinsic size so the media box is reserved before the bytes arrive. #}
-      <img src="{% if post.image_webp %}{{ post.image_webp }}{% else %}{{ post.image }}{% endif %}"
+    {% if post.image %}<img src="{% if post.image_webp %}{{ post.image_webp }}{% else %}{{ post.image }}{% endif %}"
            alt="{{ post.title }} — {{ post.author.display_name|default:post.author.username }}"
            {% seo_image_attrs post.image_width post.image_height priority="lcp" %}>
     {% elif post.video %}

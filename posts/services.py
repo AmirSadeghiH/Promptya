@@ -102,6 +102,7 @@ def serialize_post(post, *, viewer=None):
 
     return {
         "id": post.id,
+        "slug": post.slug,
         "post_type": post.post_type,
         "title": post.title,
         "description": post.description,

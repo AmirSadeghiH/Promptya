@@ -21,7 +21,7 @@ it once it is done.
     {% endcomment %}
     <article class="post-card" data-post-id="{{ post.id }}">
       <a class="post-card-media {% if post.image or post.video %}has-media{% else %}is-prompt{% endif %}"
-         href="{% url 'web:post-detail' post.id %}"
+         href="{% url 'web:post-detail' post.slug %}"
          aria-label="{{ post.title }}">
          {% if post.image %}
            <img src="{% if post.image_webp %}{{ post.image_webp }}{% else %}{{ post.image }}{% endif %}"
@@ -75,7 +75,7 @@ it once it is done.
       </a>
 
       <div class="post-card-body">
-        <a class="post-card-title" href="{% url 'web:post-detail' post.id %}">{{ post.title }}</a>
+        <a class="post-card-title" href="{% url 'web:post-detail' post.slug %}">{{ post.title }}</a>
         <div class="post-card-meta">
           <a class="creator" href="{% url 'web:profile' post.author.username %}">
             {% include "web/partials/avatar.html" with url=post.author.profile_picture name=post.author.display_name cls="creator-avatar" %}

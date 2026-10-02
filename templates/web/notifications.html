@@ -21,7 +21,7 @@
           {% elif n.type == "save" %}<span data-i18n="saved_your_post">{{ i18n.saved_your_post }}</span>
           {% elif n.type == "comment" %}<span data-i18n="commented_on_your_post">{{ i18n.commented_on_your_post }}</span>
           {% else %}<span data-i18n="started_following_you">{{ i18n.started_following_you }}</span>{% endif %}
-          {% if n.post %}<a href="{% url 'web:post-detail' n.post.id %}">“{{ n.post.title }}”</a>{% endif %}
+          {% if n.post %}<a href="{% url 'web:post-detail' n.post.slug %}">“{{ n.post.title }}”</a>{% endif %}
         </p>
         <span class="muted">{{ n.created_at|date:"M j, Y H:i" }}</span>
       </div>

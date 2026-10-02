@@ -453,9 +453,9 @@ def tag_page(request, slug):
     return response if indexable else mark_noindex(response)
 
 
-def post_detail_page(request, pk):
+def post_detail_page(request, slug):
     viewer = _viewer(request)
-    post = get_object_or_404(post_list_queryset(viewer), pk=pk)
+    post = get_object_or_404(post_list_queryset(viewer), slug=slug)
     data = serialize_post(post, viewer=viewer)
     labels = seo_labels(request)
 
@@ -522,13 +522,19 @@ def post_detail_page(request, pk):
                     "path": _language_alternate_path("web:explore"),
                 },
                 {"name": post.category.name, "path": category_path},
-                {"name": post.title, "path": _language_alternate_path("web:post-detail", post.pk)},
+                {"name": post.title, "path": _language_alternate_path("web:post-detail", post.slug)},
             ],
         ),
         "seo_jsonld_nodes": _post_jsonld(request, post, description),
     }
     response = render(request, "web/post_detail.html", context)
     return response if indexable else mark_noindex(response)
+
+
+def post_detail_legacy_page(request, pk):
+    """Redirect historical numeric post URLs to their stable descriptive slug."""
+    post = get_object_or_404(post_list_queryset(_viewer(request)), pk=pk)
+    return redirect("web:post-detail", slug=post.slug, permanent=True)
 
 
 def _post_jsonld(request, post, description):

@@ -140,13 +140,13 @@ class PostSitemap(PromptyaSitemap):
     changefreq = "weekly"
 
     def items(self):
-        return _published_posts().only("id", "updated_at").order_by("-created_at")
+        return _published_posts().only("id", "slug", "updated_at").order_by("-created_at")
 
     def lastmod(self, obj):
         return obj.updated_at
 
     def path_for(self, obj):
-        return reverse("web:post-detail", args=[obj.pk])
+        return reverse("web:post-detail", args=[obj.slug])
 
 
 class ProfileSitemap(PromptyaSitemap):

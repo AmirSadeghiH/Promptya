@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.core.validators import FileExtensionValidator
+from django.utils.text import slugify
 from django.db import models
 
 # A collection page (tag hub, listing) needs at least this many items before it
@@ -105,6 +106,9 @@ class Post(models.Model):
         max_length=200,
     )
 
+    # Stable human-readable URL; generated once so title edits do not change URLs.
+    slug = models.SlugField(max_length=220, unique=True, allow_unicode=True, blank=True, editable=False)
+
     description = models.TextField(
         blank=True,
         default="",
@@ -209,6 +213,26 @@ class Post(models.Model):
 
     def __str__(self):
         return self.title
+
+    def _generate_unique_slug(self):
+        base = slugify(self.title, allow_unicode=True) or slugify((self.prompt or "")[:120], allow_unicode=True) or "post"
+        if base.isdigit():
+            base = f"post-{base}"
+        max_length = self._meta.get_field("slug").max_length
+        base = base[:max_length]
+        candidate = base
+        suffix = 2
+        queryset = type(self).objects.exclude(pk=self.pk) if self.pk else type(self).objects.all()
+        while queryset.filter(slug=candidate).exists():
+            suffix_text = f"-{suffix}"
+            candidate = f"{base[:max_length - len(suffix_text)]}{suffix_text}"
+            suffix += 1
+        return candidate
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            self.slug = self._generate_unique_slug()
+        return super().save(*args, **kwargs)
 
     # -- SEO / indexability -------------------------------------------------
     # A post earns an index entry when it carries something a reader (and a

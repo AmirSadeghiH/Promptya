@@ -31,7 +31,8 @@ urlpatterns = [
     path("profile/<str:username>/", views.profile_page, name="profile"),
     path("settings/profile/", views.profile_edit_page, name="profile-edit"),
     path("category/<str:slug>/", views.category_page, name="category"),
-    path("post/<int:pk>/", views.post_detail_page, name="post-detail"),
+    path("post/<int:pk>/", views.post_detail_legacy_page, name="post-detail-legacy"),
+    path("post/<str:slug>/", views.post_detail_page, name="post-detail"),
     path("feed/<str:feed>/", views.feed_page, name="feed"),
     path("offline/", views.offline_page, name="offline"),
 ]

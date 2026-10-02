@@ -152,6 +152,15 @@ class SeoTestCase(TestCase):
 
 
 class UrlStrategyTests(SeoTestCase):
+    def test_old_numeric_post_url_redirects_to_slug(self):
+        response = self.fetch(f"/en/post/{self.post.pk}/")
+        self.assertEqual(response.status_code, 301)
+        self.assertEqual(response["Location"], f"{ORIGIN}/en/post/{self.post.slug}/")
+
+    def test_slug_post_url_is_canonical(self):
+        html = self.get(f"/en/post/{self.post.slug}/")
+        self.assertEqual(_canonical(html), f"{ORIGIN}/en/post/{self.post.slug}/")
+
     def test_prefixed_pages_are_the_canonical_addresses(self):
         for url in ("/en/", "/fa/", "/en/explore/", "/fa/explore/"):
             with self.subTest(url=url):
@@ -186,11 +195,11 @@ class UrlStrategyTests(SeoTestCase):
         self.assertEqual(english["x-default"], f"{ORIGIN}/en/explore/")
 
     def test_hreflang_reciprocity_holds_for_a_post(self):
-        english = _hreflangs(self.get(f"/en/post/{self.post.pk}/"))
-        persian = _hreflangs(self.get(f"/fa/post/{self.post.pk}/"))
+        english = _hreflangs(self.get(f"/en/post/{self.post.slug}/"))
+        persian = _hreflangs(self.get(f"/fa/post/{self.post.slug}/"))
         self.assertEqual(english, persian)
-        self.assertEqual(english["en"], f"{ORIGIN}/en/post/{self.post.pk}/")
-        self.assertEqual(english["fa"], f"{ORIGIN}/fa/post/{self.post.pk}/")
+        self.assertEqual(english["en"], f"{ORIGIN}/en/post/{self.post.slug}/")
+        self.assertEqual(english["fa"], f"{ORIGIN}/fa/post/{self.post.slug}/")
 
     def test_canonical_drops_the_query_string(self):
         # /studio/?source=12 and /studio/ are one document; without this, one post
@@ -220,9 +229,9 @@ class UrlStrategyTests(SeoTestCase):
         # A canonical-host redirect that also rewrote the path would break every
         # shared post link; only the origin is ever touched.
         response = self.fetch(
-            f"/en/post/{self.post.pk}/", headers={"host": "attacker.example"}
+            f"/en/post/{self.post.slug}/", headers={"host": "attacker.example"}
         )
-        self.assertEqual(response["Location"], f"{ORIGIN}/en/post/{self.post.pk}/")
+        self.assertEqual(response["Location"], f"{ORIGIN}/en/post/{self.post.slug}/")
 
     def test_page_out_of_range_is_404_not_an_empty_200(self):
         # An empty listing at a valid-looking URL is the soft-404 pattern that
@@ -312,10 +321,10 @@ class RobotsDirectiveTests(SeoTestCase):
             post_type=Post.PostType.PROMPT,
             title="Nothing but a title",
         )
-        self.assertIn("noindex", self.robots_header(f"/en/post/{bare.pk}/"))
+        self.assertIn("noindex", self.robots_header(f"/en/post/{bare.slug}/"))
 
     def test_a_post_with_only_a_prompt_is_indexable(self):
-        self.assertEqual(self.robots_header(f"/en/post/{self.post.pk}/"), "")
+        self.assertEqual(self.robots_header(f"/en/post/{self.post.slug}/"), "")
 
     def test_the_studio_is_indexable_only_for_anonymous_visitors(self):
         self.assertTrue(
@@ -402,12 +411,12 @@ class PaginationTests(SeoTestCase):
     def test_tags_are_links_not_inert_text(self):
         # Tags used to be visible <span>s, which made the whole tag dimension of
         # the site invisible to a crawler.
-        html = self.get(f"/en/post/{self.post.pk}/")
+        html = self.get(f"/en/post/{self.post.slug}/")
         self.assertIn(f'href="/en/tag/{self.tag.slug}/"', html)
         self.assertIn('rel="tag"', html)
 
     def test_a_post_links_to_its_category_and_creator(self):
-        html = self.get(f"/en/post/{self.post.pk}/")
+        html = self.get(f"/en/post/{self.post.slug}/")
         self.assertIn("/en/category/photography/", html)
         self.assertIn("/en/profile/creator/", html)
 
@@ -439,7 +448,7 @@ class StructuredDataTests(SeoTestCase):
         # A separate <script> per concern is fine; what matters is that each is
         # valid JSON with a declared @context, so a post's CreativeWork and the
         # site it belongs to can be tied together by @id.
-        html = self.get(f"/en/post/{self.post.pk}/")
+        html = self.get(f"/en/post/{self.post.slug}/")
         blocks = re.findall(
             r'<script type="application/ld\+json">(.*?)</script>', html, re.DOTALL
         )
@@ -449,16 +458,16 @@ class StructuredDataTests(SeoTestCase):
                 self.assertEqual(json.loads(block)["@context"], "https://schema.org")
 
     def test_a_post_page_describes_its_own_work(self):
-        work = _node(self.get(f"/en/post/{self.post.pk}/"), "CreativeWork")
-        self.assertEqual(work["@id"], f"{ORIGIN}/en/post/{self.post.pk}/#creativework")
+        work = _node(self.get(f"/en/post/{self.post.slug}/"), "CreativeWork")
+        self.assertEqual(work["@id"], f"{ORIGIN}/en/post/{self.post.slug}/#creativework")
         self.assertEqual(work["headline"], "Neon rain, 35mm")
         self.assertEqual(work["datePublished"], self.post.created_at.isoformat())
-        self.assertEqual(work["url"], f"{ORIGIN}/en/post/{self.post.pk}/")
+        self.assertEqual(work["url"], f"{ORIGIN}/en/post/{self.post.slug}/")
 
     def test_engagement_counts_appear_only_when_the_page_shows_them(self):
         # No likes and no comments: claiming an InteractionCounter of zero would
         # assert engagement the visible page does not display.
-        work = _node(self.get(f"/en/post/{self.post.pk}/"), "CreativeWork")
+        work = _node(self.get(f"/en/post/{self.post.slug}/"), "CreativeWork")
         self.assertNotIn("interactionStatistic", work)
 
     def test_engagement_counts_are_reported_once_they_exist(self):
@@ -466,7 +475,7 @@ class StructuredDataTests(SeoTestCase):
 
         Like.objects.create(user=self.author, post=self.post)
         Comment.objects.create(user=self.author, post=self.post, content="Useful")
-        work = _node(self.get(f"/en/post/{self.post.pk}/"), "CreativeWork")
+        work = _node(self.get(f"/en/post/{self.post.slug}/"), "CreativeWork")
         counts = {
             stat["interactionType"].rsplit("/", 1)[-1]: stat["userInteractionCount"]
             for stat in work["interactionStatistic"]
@@ -476,12 +485,12 @@ class StructuredDataTests(SeoTestCase):
     def test_no_review_or_rating_is_invented(self):
         # Promptya has no rating system. Claiming one in structured data is a
         # manual-action risk, so the property is absent rather than zeroed.
-        html = self.get(f"/en/post/{self.post.pk}/")
+        html = self.get(f"/en/post/{self.post.slug}/")
         self.assertNotIn("aggregateRating", html)
         self.assertNotIn("Review", _types(html))
 
     def test_the_author_is_a_person_tied_to_the_author_node(self):
-        html = self.get(f"/en/post/{self.post.pk}/")
+        html = self.get(f"/en/post/{self.post.slug}/")
         work = _node(html, "CreativeWork")
         self.assertEqual(work["author"]["@id"], f"{ORIGIN}/en/profile/creator/#person")
         self.assertEqual(_node(html, "Person")["@id"], f"{ORIGIN}/en/profile/creator/#person")
@@ -492,20 +501,20 @@ class StructuredDataTests(SeoTestCase):
         self.assertEqual(page["mainEntity"], {"@id": f"{ORIGIN}/en/profile/creator/#person"})
 
     def test_breadcrumbs_are_structured_and_match_the_visible_trail(self):
-        html = self.get(f"/en/post/{self.post.pk}/")
+        html = self.get(f"/en/post/{self.post.slug}/")
         trail = _node(html, "BreadcrumbList")
         self.assertIsNotNone(trail)
-        self.assertEqual(trail["@id"], f"{ORIGIN}/en/post/{self.post.pk}/#breadcrumb")
+        self.assertEqual(trail["@id"], f"{ORIGIN}/en/post/{self.post.slug}/#breadcrumb")
         last = trail["itemListElement"][-1]
         self.assertEqual(last["position"], 4)
-        self.assertEqual(last["item"], f"{ORIGIN}/en/post/{self.post.pk}/")
+        self.assertEqual(last["item"], f"{ORIGIN}/en/post/{self.post.slug}/")
         # The last crumb is rendered as plain text, not as a link to itself.
         self.assertIn('aria-current="page"', html)
 
     def test_a_breadcrumb_is_a_single_json_document(self):
         # Django's urlize/split would let a per-entity href disagree with the
         # visible trail; both come from the same `crumbs` list in the view.
-        html = self.get(f"/fa/post/{self.post.pk}/")
+        html = self.get(f"/fa/post/{self.post.slug}/")
         for crumb in _node(html, "BreadcrumbList")["itemListElement"]:
             with self.subTest(position=crumb["position"]):
                 self.assertTrue(crumb["item"].startswith(f"{ORIGIN}/fa/"), crumb["item"])
@@ -515,7 +524,7 @@ class StructuredDataTests(SeoTestCase):
         self.assertIn("CollectionPage", _types(html))
         items = _node(html, "ItemList")
         self.assertEqual(
-            items["itemListElement"][0]["url"], f"{ORIGIN}/en/post/{self.post.pk}/"
+            items["itemListElement"][0]["url"], f"{ORIGIN}/en/post/{self.post.slug}/"
         )
 
     def test_collection_item_list_has_a_stable_node_id(self):
@@ -524,18 +533,18 @@ class StructuredDataTests(SeoTestCase):
         self.assertEqual(items["@id"], f"{ORIGIN}/en/category/photography/#itemlist")
 
     def test_creative_work_is_part_of_its_page_node(self):
-        html = self.get(f"/en/post/{self.post.pk}/")
+        html = self.get(f"/en/post/{self.post.slug}/")
         work = _node(html, "CreativeWork")
-        self.assertEqual(work["isPartOf"], {"@id": f"{ORIGIN}/en/post/{self.post.pk}/#webpage"})
+        self.assertEqual(work["isPartOf"], {"@id": f"{ORIGIN}/en/post/{self.post.slug}/#webpage"})
 
     def test_a_title_containing_a_script_tag_cannot_break_out_of_the_json(self):
         nasty = _post(self.author, self.category, "Ha </script><script>alert(1)</script>")
-        html = self.get(f"/en/post/{nasty.pk}/")
+        html = self.get(f"/en/post/{nasty.slug}/")
         self.assertNotIn("<script>alert(1)</script>", html)
         self.assertEqual(_node(html, "CreativeWork")["headline"], nasty.title)
 
     def test_persian_pages_declare_persian_structured_data(self):
-        html = self.get(f"/fa/post/{self.post.pk}/")
+        html = self.get(f"/fa/post/{self.post.slug}/")
         self.assertEqual(_node(html, "CreativeWork")["inLanguage"], "fa")
 
     def test_the_website_search_action_points_at_the_search_page(self):
@@ -553,14 +562,35 @@ class StructuredDataTests(SeoTestCase):
 
 
 class MetadataTests(SeoTestCase):
+    def test_login_has_default_og_image_without_page_meta_context(self):
+        for language in ("en", "fa"):
+            with self.subTest(language=language):
+                self.client.cookies[LANG_COOKIE] = language
+                response = self.fetch("/login/")
+                self.assertEqual(response.status_code, 200)
+                html = response.content.decode()
+                self.assertIn(f'<html lang="{language}"', html)
+                self.assertEqual(_property(html, "og:image"), f"{ORIGIN}/static/icons/icon-512.png")
+
+    def test_post_slug_is_stable_when_title_changes(self):
+        original_slug = self.post.slug
+        self.post.title = "A completely new title"
+        self.post.save()
+        self.assertEqual(self.post.slug, original_slug)
+
+    def test_duplicate_titles_receive_unique_slugs(self):
+        duplicate = _post(self.author, self.category, self.post.title)
+        self.assertNotEqual(duplicate.slug, self.post.slug)
+        self.assertTrue(duplicate.slug.startswith(self.post.slug))
+
     def test_a_post_title_is_built_from_the_authors_own_words(self):
-        title = _title(self.get(f"/en/post/{self.post.pk}/"))
+        title = _title(self.get(f"/en/post/{self.post.slug}/"))
         self.assertIn("Neon rain, 35mm", title)
         self.assertIn("@creator", title)
 
     def test_titles_and_descriptions_stay_within_their_budgets(self):
         long_post = _post(self.author, self.category, "T" * 400, description="D" * 900)
-        html = self.get(f"/en/post/{long_post.pk}/")
+        html = self.get(f"/en/post/{long_post.slug}/")
         self.assertLessEqual(len(_title(html)), seo.TITLE_LIMIT)
         self.assertLessEqual(len(_meta(html, "description")), seo.DESCRIPTION_LIMIT)
 
@@ -572,7 +602,7 @@ class MetadataTests(SeoTestCase):
                 self.assertTrue(_meta(html, "description").strip())
 
     def test_og_image_is_absolute(self):
-        image = _property(self.get(f"/en/post/{self.post.pk}/"), "og:image")
+        image = _property(self.get(f"/en/post/{self.post.slug}/"), "og:image")
         self.assertTrue(image.startswith("https://"), image)
 
 
@@ -593,7 +623,7 @@ class MetadataTests(SeoTestCase):
     def test_no_meta_tag_leaks_a_python_repr_into_a_url(self):
         # A general guard: any URL-bearing meta must be a parseable absolute URL,
         # so a mis-passed object in a tag cannot masquerade as one.
-        for url in ("/en/", "/en/explore/", f"/en/post/{self.post.pk}/"):
+        for url in ("/en/", "/en/explore/", f"/en/post/{self.post.slug}/"):
             with self.subTest(url=url):
                 html = self.get(url)
                 tags = {
@@ -614,7 +644,7 @@ class MetadataTests(SeoTestCase):
 
     def test_a_post_page_is_an_article(self):
         self.assertEqual(
-            _property(self.get(f"/en/post/{self.post.pk}/"), "og:type"), "article"
+            _property(self.get(f"/en/post/{self.post.slug}/"), "og:type"), "article"
         )
 
     def test_a_profile_page_is_a_profile(self):
@@ -745,7 +775,7 @@ class SitemapTests(SeoTestCase):
             prompt="x" * (Post.MIN_MEANINGFUL_LENGTH - 1),
         )
         self.assertFalse(short.is_indexable)
-        self.assertNotIn(f"<loc>{ORIGIN}/en/post/{short.pk}/</loc>", self.xml())
+        self.assertNotIn(f"<loc>{ORIGIN}/en/post/{short.slug}/</loc>", self.xml())
 
     def test_it_omits_a_tag_below_the_depth_threshold(self):
         lonely = _tag("lonely")
@@ -757,8 +787,8 @@ class SitemapTests(SeoTestCase):
 
     def test_it_lists_both_languages_of_a_post_with_an_x_default(self):
         xml = self.xml()
-        self.assertIn(f"<loc>{ORIGIN}/en/post/{self.post.pk}/</loc>", xml)
-        self.assertIn(f"<loc>{ORIGIN}/fa/post/{self.post.pk}/</loc>", xml)
+        self.assertIn(f"<loc>{ORIGIN}/en/post/{self.post.slug}/</loc>", xml)
+        self.assertIn(f"<loc>{ORIGIN}/fa/post/{self.post.slug}/</loc>", xml)
         self.assertIn('hreflang="x-default"', xml)
         self.assertIn('hreflang="fa"', xml)
 
