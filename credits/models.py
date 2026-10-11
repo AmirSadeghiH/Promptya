@@ -10,12 +10,19 @@ only the fast path for *what* the number currently is.
 from django.conf import settings
 from django.db import models
 
+
 # What a movement means. Every charge/reward/refund/adjustment is one of these.
 class TransactionKind(models.TextChoices):
     GENERATION = "generation", "Generation charge"
     REWARD = "reward", "Reward"
     REFUND = "refund", "Refund"
     ADJUSTMENT = "adjustment", "Admin adjustment"
+
+
+class ChallengeType(models.TextChoices):
+    """Whether this is a permanent mission or a time-bounded challenge."""
+    MISSION = "mission", "Mission (permanent)"
+    CHALLENGE = "challenge", "Challenge (time-bounded)"
 
 
 class CreditTransaction(models.Model):
@@ -87,6 +94,12 @@ class Challenge(models.Model):
     verifier, never editing this class or the reward path.
     """
 
+    class Meta:
+        ordering = ["reward_credits", "slug"]
+        indexes = [
+            models.Index(fields=["is_active", "starts_at", "ends_at"]),
+        ]
+
     slug = models.SlugField(max_length=60, unique=True)
 
     title = models.CharField(max_length=120)
@@ -100,18 +113,73 @@ class Challenge(models.Model):
 
     reward_credits = models.PositiveIntegerField(default=0)
 
-    is_active = models.BooleanField(default=True)
-
-    max_rewards_per_user = models.PositiveIntegerField(
-        default=1,
-        help_text="0 means the challenge can be completed without limit.",
+    # Type: mission (permanent) or challenge (time-bounded)
+    type = models.CharField(
+        max_length=10,
+        choices=ChallengeType.choices,
+        default=ChallengeType.CHALLENGE,
     )
 
-    class Meta:
-        ordering = ["reward_credits", "slug"]
+    # Time window for challenges (ignored for missions)
+    starts_at = models.DateTimeField(
+        blank=True,
+        null=True,
+        help_text="When this challenge becomes available. Empty = immediately.",
+    )
+    ends_at = models.DateTimeField(
+        blank=True,
+        null=True,
+        help_text="When this challenge expires. Empty = no expiry.",
+    )
+
+    is_active = models.BooleanField(default=True)
+
+    # Per-user limit (0 = unlimited)
+    max_rewards_per_user = models.PositiveIntegerField(
+        default=1,
+        help_text="0 means the challenge can be completed without limit per user.",
+    )
+
+    # Global limit across all users (0 = unlimited)
+    max_total_rewards = models.PositiveIntegerField(
+        default=0,
+        help_text="0 means no global limit on total rewards for this challenge.",
+    )
+
+    # Optional sponsor reference
+    sponsor = models.CharField(
+        max_length=120,
+        blank=True,
+        default="",
+        help_text="Optional sponsor name for branded challenges.",
+    )
 
     def __str__(self):
         return f"{self.title} (+{self.reward_credits})"
+
+    def is_open(self, now=None):
+        """Check if challenge is currently within its time window and active."""
+        from django.utils import timezone
+        now = now or timezone.now()
+        if not self.is_active:
+            return False
+        if self.type == ChallengeType.MISSION:
+            return True
+        if self.starts_at and now < self.starts_at:
+            return False
+        if self.ends_at and now >= self.ends_at:
+            return False
+        return True
+
+    def global_rewards_claimed(self):
+        """Count of verified completions for global cap check."""
+        return self.completions.filter(status=ChallengeCompletion.Status.VERIFIED).count()
+
+    def can_claim_globally(self):
+        """Check if global reward cap has been reached."""
+        if self.max_total_rewards == 0:
+            return True
+        return self.global_rewards_claimed() < self.max_total_rewards
 
 
 class ChallengeCompletion(models.Model):
@@ -168,6 +236,15 @@ class ChallengeCompletion(models.Model):
         related_name="challenge_completion",
     )
 
+    # Idempotency key for duplicate-safe submission (client-generated)
+    idempotency_key = models.CharField(
+        max_length=64,
+        blank=True,
+        default="",
+        db_index=True,
+        help_text="Client-provided key to prevent duplicate submissions.",
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     verified_at = models.DateTimeField(blank=True, null=True)
 
@@ -177,6 +254,11 @@ class ChallengeCompletion(models.Model):
             models.UniqueConstraint(
                 fields=["challenge", "user", "evidence"],
                 name="unique_challenge_evidence_per_user",
+            ),
+            models.UniqueConstraint(
+                fields=["idempotency_key"],
+                condition=models.Q(idempotency_key__gt=""),
+                name="unique_idempotency_key",
             ),
         ]
         indexes = [

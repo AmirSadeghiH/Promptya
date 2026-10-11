@@ -103,7 +103,7 @@ def _node(html, node_type):
     return next((node for node in _ld_json(html) if node.get("@type") == node_type), None)
 
 
-@override_settings(SITE_URL=ORIGIN)
+@override_settings(SITE_URL=ORIGIN, ALLOWED_HOSTS=["testserver", "www.testserver", "attacker.example"])
 class SeoTestCase(TestCase):
     """Shared fixtures and a request helper that speaks https.
 

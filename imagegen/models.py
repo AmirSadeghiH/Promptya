@@ -143,6 +143,18 @@ class GeneratedImage(models.Model):
         default="",
     )
 
+    # Idempotency key to prevent duplicate charges on retry.
+    # Client generates a unique key per generation attempt and sends it in
+    # the Idempotency-Key header. If a request with the same key is received
+    # within 24 hours, the existing result is returned.
+    idempotency_key = models.CharField(
+        max_length=64,
+        blank=True,
+        default="",
+        db_index=True,
+        help_text="Client-provided idempotency key for duplicate prevention.",
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
 
     finished_at = models.DateTimeField(blank=True, null=True)

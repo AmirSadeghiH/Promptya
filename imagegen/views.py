@@ -16,6 +16,7 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
+from core.ratelimit import rate_limit_user
 from credits.services import InsufficientCredits
 from posts.models import Post
 
@@ -58,6 +59,8 @@ def _source_post(data):
 
 
 @login_required
+@rate_limit_user("generate", limit=10, window_seconds=60, error_message="Too many generation requests. Try again in a minute.")
+@rate_limit_user("generate_hourly", limit=50, window_seconds=3600, error_message="Hourly generation limit reached. Try again later.")
 @csrf_exempt
 @require_POST
 def api_generate(request):
@@ -67,6 +70,14 @@ def api_generate(request):
             {"error_code": "bad_request", "error": "Invalid JSON body."}, status=400
         )
 
+    # Extract idempotency key from header (optional but recommended for retries)
+    idempotency_key = request.headers.get("Idempotency-Key", "").strip() or None
+    if idempotency_key and len(idempotency_key) > 64:
+        return JsonResponse(
+            {"error_code": "bad_request", "error": "Idempotency-Key too long (max 64 chars)."},
+            status=400,
+        )
+
     try:
         record = generate_image(
             request.user,
@@ -74,6 +85,7 @@ def api_generate(request):
             size=str(data.get("size") or "").strip() or None,
             source_post=_source_post(data),
             source_image=source_image,
+            idempotency_key=idempotency_key,
         )
     except PromptRejected as exc:
         return JsonResponse(

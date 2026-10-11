@@ -29,13 +29,16 @@ _RANGE_RE = re.compile(r"bytes=(\d*)-(\d*)$")
 
 
 class ApiCompatMiddleware:
+    """Convert @login_required redirects to 401 JSON for API paths.
+
+    CSRF enforcement is intentionally NOT disabled — the frontend sends
+    X-CSRFToken from the csrftoken cookie, and the mobile client must do the same.
+    """
+
     def __init__(self, get_response):
         self.get_response = get_response
 
     def __call__(self, request):
-        if request.path.startswith(API_PREFIX):
-            request._dont_enforce_csrf_checks = True
-
         response = self.get_response(request)
 
         if (

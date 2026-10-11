@@ -9,6 +9,7 @@ from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from django.views.decorators.http import require_POST
 
+from core.ratelimit import rate_limit_user, rate_limit_ip
 from interactions.models import Comment, Follow, Like, PostCopy, PostView, Save
 from posts.models import Post
 from posts.services import post_list_queryset, serialize_post
@@ -25,6 +26,7 @@ def _method_not_allowed():
     return JsonResponse({"error": "Method not allowed."}, status=405)
 
 
+@rate_limit_ip("post_view", limit=120, window_seconds=60, error_message="Too many view requests. Slow down.")
 def record_view(request, post_id):
     if request.method != "POST":
         return _method_not_allowed()
@@ -39,6 +41,7 @@ def record_view(request, post_id):
 
 
 @login_required
+@rate_limit_user("post_copy", limit=30, window_seconds=60, error_message="Too many copy requests. Slow down.")
 @require_POST
 def record_copy(request, post_id):
     post, error_response = _get_post_or_error(post_id)
@@ -50,6 +53,7 @@ def record_copy(request, post_id):
 
 
 @login_required
+@rate_limit_user("post_like", limit=60, window_seconds=60, error_message="Too many like requests. Slow down.")
 @require_POST
 @transaction.atomic
 def toggle_like(request, post_id):
@@ -69,6 +73,7 @@ def toggle_like(request, post_id):
 
 
 @login_required
+@rate_limit_user("post_save", limit=60, window_seconds=60, error_message="Too many save requests. Slow down.")
 @require_POST
 @transaction.atomic
 def toggle_save(request, post_id):
@@ -88,6 +93,7 @@ def toggle_save(request, post_id):
 
 
 @login_required
+@rate_limit_user("post_comment", limit=20, window_seconds=60, error_message="Too many comments. Slow down.")
 @require_POST
 def create_comment(request, post_id):
     post, error_response = _get_post_or_error(post_id)
@@ -181,6 +187,7 @@ def list_comments(request, post_id):
 
 
 @login_required
+@rate_limit_user("user_follow", limit=30, window_seconds=60, error_message="Too many follow requests. Slow down.")
 @require_POST
 @transaction.atomic
 def toggle_follow(request, username):

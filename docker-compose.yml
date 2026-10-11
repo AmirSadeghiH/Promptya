@@ -1,0 +1,125 @@
+# Promptya docker-compose.yml
+# Production deployment with PostgreSQL, Redis, and the Django application
+
+version: "3.9"
+
+services:
+  # PostgreSQL database
+  db:
+    image: postgres:16-alpine
+    container_name: promptya-db
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-promptya}
+      POSTGRES_USER: ${POSTGRES_USER:-promptya}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - promptya-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-promptya} -d ${POSTGRES_DB:-promptya}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - promptya-network
+    restart: unless-stopped
+
+  # Redis cache
+  redis:
+    image: redis:7-alpine
+    container_name: promptya-redis
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - promptya-redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - promptya-network
+    restart: unless-stopped
+
+  # Django application
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: promptya-web
+    environment:
+      # Required in production
+      DJANGO_DEBUG: "false"
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS}
+      PROMPTYA_SITE_URL: ${PROMPTYA_SITE_URL}
+
+      # Database (constructed from db service)
+      DATABASE_URL: postgres://${POSTGRES_USER:-promptya}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-promptya}
+
+      # Redis cache
+      REDIS_URL: redis://redis:6379/0
+
+      # Email (SMTP)
+      EMAIL_HOST: ${EMAIL_HOST}
+      EMAIL_PORT: ${EMAIL_PORT:-587}
+      EMAIL_HOST_USER: ${EMAIL_HOST_USER}
+      EMAIL_HOST_PASSWORD: ${EMAIL_HOST_PASSWORD}
+      EMAIL_USE_TLS: ${EMAIL_USE_TLS:-true}
+      DEFAULT_FROM_EMAIL: ${DEFAULT_FROM_EMAIL:-Promptya <noreply@promptya.app>}
+
+      # AI Provider (configured in admin, but can be set here)
+      # AI_PROVIDER_BASE_URL: ${AI_PROVIDER_BASE_URL}
+      # AI_PROVIDER_API_KEY: ${AI_PROVIDER_API_KEY}
+      # AI_PROVIDER_MODEL: ${AI_PROVIDER_MODEL}
+
+      # S3-compatible media storage (optional)
+      AWS_STORAGE_BUCKET_NAME: ${AWS_STORAGE_BUCKET_NAME}
+      AWS_S3_REGION_NAME: ${AWS_S3_REGION_NAME:-us-east-1}
+      AWS_S3_ENDPOINT_URL: ${AWS_S3_ENDPOINT_URL}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+
+      # CSRF trusted origins
+      DJANGO_CSRF_TRUSTED_ORIGINS: ${DJANGO_CSRF_TRUSTED_ORIGINS}
+
+      # Security
+      DJANGO_SECURE_SSL_REDIRECT: "true"
+
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - promptya-network
+    restart: unless-stopped
+
+  # Nginx reverse proxy (optional - for SSL termination and static file serving)
+  nginx:
+    image: nginx:alpine
+    container_name: promptya-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+      - promptya-staticfiles:/app/staticfiles:ro
+      - promptya-media:/app/media:ro
+    depends_on:
+      - web
+    networks:
+      - promptya-network
+    restart: unless-stopped
+
+volumes:
+  promptya-db-data:
+  promptya-redis-data:
+  promptya-staticfiles:
+  promptya-media:
+
+networks:
+  promptya-network:
+    driver: bridge

@@ -1,5 +1,64 @@
 from django.contrib.auth import authenticate, get_user_model, login, logout
 from django.shortcuts import redirect, render
+from django.template.loader import render_to_string
+from django.core.mail import send_mail
+from django.conf import settings
+from django.utils import timezone
+import secrets
+
+
+def _create_verification_token(user):
+    """Create or replace a verification token for the user."""
+    from account.models import EmailVerificationToken
+
+    token = secrets.token_urlsafe(32)
+    expires_at = timezone.now() + timezone.timedelta(hours=24)
+
+    EmailVerificationToken.objects.update_or_create(
+        user=user,
+        defaults={
+            "token": token,
+            "expires_at": expires_at,
+            "used_at": None,
+        },
+    )
+    return token
+
+
+def _send_verification_email(request, user, token):
+    """Send verification email to the user."""
+    verify_url = request.build_absolute_uri(
+        f"/api/auth/verify-email/{token}/"
+    )
+
+    subject = render_to_string("account/verification_email_subject.txt").strip()
+    html_message = render_to_string(
+        "account/verification_email.html",
+        {
+            "user": user,
+            "verify_url": verify_url,
+            "site_name": getattr(settings, "SITE_URL", "").rstrip("/")
+            or request.get_host(),
+        },
+    )
+    plain_message = render_to_string(
+        "account/verification_email.txt",
+        {
+            "user": user,
+            "verify_url": verify_url,
+            "site_name": getattr(settings, "SITE_URL", "").rstrip("/")
+            or request.get_host(),
+        },
+    )
+
+    send_mail(
+        subject,
+        plain_message,
+        settings.DEFAULT_FROM_EMAIL,
+        [user.email],
+        html_message=html_message,
+        fail_silently=False,
+    )
 
 
 def login_page(request):
@@ -51,8 +110,13 @@ def signup_page(request):
             if referrer is not None:
                 user.referred_by = referrer
                 user.save(update_fields=["referred_by"])
-            login(request, user)
-            return redirect("web:home")
+
+            # Create and send verification token
+            token = _create_verification_token(user)
+            _send_verification_email(request, user, token)
+
+            # Don't log in - user must verify email first
+            return render(request, "web/verification_sent.html", {"email": email})
 
     return render(request, "web/signup.html", {"error": error, "ref": ref})
 

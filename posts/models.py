@@ -186,6 +186,11 @@ class Post(models.Model):
         default="",
     )
 
+    is_hidden = models.BooleanField(
+        default=False,
+        help_text="Hidden by moderation. Hidden posts are not visible in public feeds.",
+    )
+
     created_at = models.DateTimeField(
         auto_now_add=True,
     )
@@ -259,6 +264,8 @@ class Post(models.Model):
     @property
     def is_indexable(self):
         """Whether this post may be indexed, and appear in the sitemap."""
+        if self.is_hidden:
+            return False
         if not self.title or not self.title.strip():
             return False
         if len(self.meaningful_text) >= self.MIN_MEANINGFUL_LENGTH:

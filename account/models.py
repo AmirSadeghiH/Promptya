@@ -1,5 +1,12 @@
+from django.conf import settings
 from django.contrib.auth.models import AbstractUser
 from django.db import models
+from django.utils import timezone
+
+
+def _default_verification_expiry():
+    """Default expiry: 24 hours from now."""
+    return timezone.now() + timezone.timedelta(hours=24)
 
 
 class CustomUser(AbstractUser):
@@ -85,3 +92,46 @@ class CustomUser(AbstractUser):
         follow button) but are excluded from the index and from the sitemap.
         """
         return self.is_active and self.public_post_count > 0
+
+
+class EmailVerificationToken(models.Model):
+    """One-time email verification token.
+
+    Tokens are generated at signup and sent via email. They expire after
+    24 hours and can only be used once. A user can have at most one valid
+    token at a time (new tokens invalidate old ones).
+    """
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="verification_token",
+    )
+
+    token = models.CharField(
+        max_length=64,
+        unique=True,
+        db_index=True,
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    expires_at = models.DateTimeField(default=_default_verification_expiry)
+
+    used_at = models.DateTimeField(blank=True, null=True)
+
+    class Meta:
+        verbose_name = "Email verification token"
+        verbose_name_plural = "Email verification tokens"
+
+    def __str__(self):
+        return f"Verification token for {self.user}"
+
+    def is_valid(self):
+        """Check if token is still valid (not expired, not used)."""
+        return self.used_at is None and timezone.now() < self.expires_at
+
+    def mark_used(self):
+        """Mark token as used."""
+        self.used_at = timezone.now()
+        self.save(update_fields=["used_at"])

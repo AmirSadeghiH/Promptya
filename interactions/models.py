@@ -140,6 +140,11 @@ class Comment(models.Model):
         max_length=2000,
     )
 
+    is_hidden = models.BooleanField(
+        default=False,
+        help_text="Hidden by moderation. Hidden comments are not visible on posts.",
+    )
+
     created_at = models.DateTimeField(
         auto_now_add=True,
     )

@@ -9,8 +9,14 @@ from django.contrib.sitemaps.views import sitemap
 from django.urls import include, path
 from web import auth_views, views
 from web.sitemaps import SITEMAPS
+from core.health import HealthCheckView, DatabaseHealthCheckView, DetailedHealthCheckView
 
 urlpatterns = [
+    # Health checks (no CSRF, no auth, no i18n prefix)
+    path("health/", HealthCheckView.as_view(), name="health"),
+    path("health/db/", DatabaseHealthCheckView.as_view(), name="health-db"),
+    path("health/detail/", DetailedHealthCheckView.as_view(), name="health-detail"),
+
     path('admin/', admin.site.urls),
 
     # --- JSON API: never prefixed, never part of the page index -------------

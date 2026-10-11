@@ -1,4 +1,5 @@
 from django.contrib.auth import get_user_model
+from django.core import mail
 from django.test import TestCase
 from django.urls import reverse
 
@@ -17,7 +18,7 @@ def _make_post(author, title):
 
 
 class AuthApiTests(TestCase):
-    def test_signup_creates_user_and_logs_in(self):
+    def test_signup_creates_user_sends_verification_email(self):
         response = self.client.post(
             reverse("account:signup"),
             {
@@ -32,8 +33,14 @@ class AuthApiTests(TestCase):
         self.assertTrue(
             get_user_model().objects.filter(username="newuser").exists()
         )
+        user = get_user_model().objects.get(username="newuser")
+        self.assertFalse(user.is_verified)
+        # User should NOT be logged in
         me = self.client.get(reverse("account:me"))
-        self.assertEqual(me.json()["user"]["username"], "newuser")
+        self.assertEqual(me.status_code, 401)
+        # Verification email should be sent
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn("Verify your email", mail.outbox[0].subject)
 
     def test_signup_rejects_duplicate_username(self):
         get_user_model().objects.create_user(
@@ -56,11 +63,13 @@ class AuthApiTests(TestCase):
         self.assertIn("username", response.json()["errors"])
 
     def test_login_with_username_or_email(self):
-        get_user_model().objects.create_user(
+        user = get_user_model().objects.create_user(
             username="loginuser",
             email="loginuser@example.com",
             password="super-secret-123",
         )
+        user.is_verified = True
+        user.save()
 
         by_username = self.client.post(
             reverse("account:login"),
@@ -68,6 +77,7 @@ class AuthApiTests(TestCase):
             content_type="application/json",
         )
         self.assertEqual(by_username.status_code, 200)
+        self.assertTrue(by_username.json()["user"]["is_verified"])
 
         self.client.post(reverse("account:logout"))
         by_email = self.client.post(
@@ -90,6 +100,128 @@ class AuthApiTests(TestCase):
         response = self.client.get(reverse("account:me"))
 
         self.assertEqual(response.status_code, 401)
+
+
+class EmailVerificationTests(TestCase):
+    def setUp(self):
+        from django.core.cache import cache
+        cache.clear()
+        self.user = get_user_model().objects.create_user(
+            username="verifyuser",
+            email="verifyuser@example.com",
+            password="test-password",
+        )
+
+    def test_verification_success(self):
+        from account.models import EmailVerificationToken
+        import secrets
+
+        token = secrets.token_urlsafe(32)
+        token_obj = EmailVerificationToken.objects.create(user=self.user, token=token)
+
+        response = self.client.get(reverse("account:verify-email", args=[token]))
+        self.assertEqual(response.status_code, 200)
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.is_verified)
+        token_obj.refresh_from_db()
+        self.assertIsNotNone(token_obj.used_at)
+
+    def test_verification_invalid_token(self):
+        response = self.client.get(reverse("account:verify-email", args=["invalid-token"]))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "invalid")
+
+    def test_verification_expired_token(self):
+        from account.models import EmailVerificationToken
+        from django.utils import timezone
+        from datetime import timedelta
+        import secrets
+
+        token = secrets.token_urlsafe(32)
+        token_obj = EmailVerificationToken.objects.create(
+            user=self.user, token=token, expires_at=timezone.now() - timedelta(hours=1)
+        )
+
+        response = self.client.get(reverse("account:verify-email", args=[token]))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "expired")
+
+    def test_verification_already_used_token(self):
+        from account.models import EmailVerificationToken
+        from django.utils import timezone
+        import secrets
+
+        token = secrets.token_urlsafe(32)
+        token_obj = EmailVerificationToken.objects.create(user=self.user, token=token, used_at=timezone.now())
+
+        response = self.client.get(reverse("account:verify-email", args=[token]))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "already been used")
+
+    def test_verification_already_verified_user(self):
+        from account.models import EmailVerificationToken
+        import secrets
+
+        self.user.is_verified = True
+        self.user.save()
+        token = secrets.token_urlsafe(32)
+        token_obj = EmailVerificationToken.objects.create(user=self.user, token=token)
+
+        response = self.client.get(reverse("account:verify-email", args=[token]))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "already verified")
+
+    def test_resend_verification_rate_limited(self):
+        from account.models import EmailVerificationToken
+
+        # Create user
+        self.user = get_user_model().objects.create_user(
+            username="resenduser",
+            email="resenduser@example.com",
+            password="test-password",
+        )
+
+        # First resend
+        response = self.client.post(
+            reverse("account:resend-verification"),
+            {"email": "resenduser@example.com"},
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+
+        # Second resend (limit is 3/hour)
+        response = self.client.post(
+            reverse("account:resend-verification"),
+            {"email": "resenduser@example.com"},
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+
+        # Third resend
+        response = self.client.post(
+            reverse("account:resend-verification"),
+            {"email": "resenduser@example.com"},
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+
+        # Fourth resend should be rate limited
+        response = self.client.post(
+            reverse("account:resend-verification"),
+            {"email": "resenduser@example.com"},
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 429)
+
+    def test_resend_verification_enumeration_resistant(self):
+        # Should not reveal if email exists or not
+        response = self.client.post(
+            reverse("account:resend-verification"),
+            {"email": "nonexistent@example.com"},
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("success", response.json())
 
 
 class ProfileApiTests(TestCase):

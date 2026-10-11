@@ -98,12 +98,17 @@ def generate_image(
     source_post=None,
     source_image=None,
     provider_factory=None,
+    idempotency_key=None,
 ):
     """Generate one image for *user* and store it.
 
     Raises ``PromptRejected``, ``SourceImageRejected``, ``InsufficientCredits``
     or ``GenerationError``.  Credits are charged before the provider is
     contacted and refunded if it fails, so the wallet always matches reality.
+
+    If ``idempotency_key`` is provided, checks for an existing generation with
+    the same key from the same user within the last 24 hours and returns it
+    instead of creating a new one.
     """
     cleaned = check_prompt(prompt)
 
@@ -115,6 +120,20 @@ def generate_image(
 
     cost = int(config.credit_cost or 0)
 
+    # Idempotency check: if key provided, look for existing completed generation
+    if idempotency_key:
+        from django.utils import timezone
+        from datetime import timedelta
+
+        existing = GeneratedImage.objects.filter(
+            user=user,
+            idempotency_key=idempotency_key,
+            status__in=[GeneratedImage.Status.READY, GeneratedImage.Status.FAILED],
+            created_at__gte=timezone.now() - timedelta(hours=24),
+        ).first()
+        if existing:
+            return existing
+
     record = GeneratedImage.objects.create(
         user=user,
         prompt=cleaned,
@@ -122,6 +141,7 @@ def generate_image(
         provider_model=config.model,
         credit_cost=cost,
         status=GeneratedImage.Status.PENDING,
+        idempotency_key=idempotency_key or "",
     )
 
     # Reserve the credits before doing any work. A refusal here is final: the

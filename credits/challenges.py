@@ -10,15 +10,22 @@ path at all.
 from __future__ import annotations
 
 import re
+from datetime import timedelta
 
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError, models, transaction
 from django.utils import timezone
 
-from credits.models import Challenge, ChallengeCompletion
+from credits.models import Challenge, ChallengeCompletion, CreditTransaction, TransactionKind, ChallengeType
 from credits.services import reward
 
 INVITE_FRIEND = "invite_friend"
 INSTAGRAM_SHARE = "instagram_share"
+COMPLETE_PROFILE = "complete_profile"
+FIRST_GENERATION = "first_generation"
+FIRST_POST = "first_post"
+
+# Referral protection settings
+MAX_REFERRALS_PER_MONTH = 5  # Max referral rewards a user can earn per 30 days
 
 # An Instagram post/reel/tv permalink.  We can only check the shape of the
 # link, not that the account is the user's — so sharing also requires a real
@@ -41,8 +48,8 @@ def verify_invite_friend(user, challenge, evidence):
     """Reward a referrer once the friend they invited has generated an image.
 
     ``user`` is the referrer; ``evidence`` is the invited account's id.  The
-    invite only pays out after the signup does something real, which is what
-    makes this a referral and not a faucet.
+    invite only pays out after the signup does something real *and spends their
+    own credits*, which is what makes this a referral and not a faucet.
     """
     from django.contrib.auth import get_user_model
 
@@ -57,11 +64,34 @@ def verify_invite_friend(user, challenge, evidence):
     if invited is None:
         return False, "We couldn't match that invite to your account."
 
-    made_something = GeneratedImage.objects.filter(
-        user=invited, status=GeneratedImage.Status.READY
+    # Invited user must have verified their email
+    if not invited.is_verified:
+        return False, "Your friend hasn't verified their email address yet."
+
+    # Check that the invited user has at least one successful generation
+    # that was NOT refunded (i.e., they actually spent credits).
+    # A generation charge (GENERATION transaction) that wasn't refunded means
+    # they used their own credits (signup bonus or earned).
+    has_real_generation = CreditTransaction.objects.filter(
+        user=invited,
+        kind=TransactionKind.GENERATION,
     ).exists()
-    if not made_something:
-        return False, "Your friend hasn't generated an image yet."
+
+    if not has_real_generation:
+        return False, "Your friend hasn't generated an image using their own credits yet."
+
+    # Check monthly referral cap for the referrer
+    month_ago = timezone.now() - timedelta(days=30)
+    recent_referrals = ChallengeCompletion.objects.filter(
+        user=user,
+        challenge__slug=INVITE_FRIEND,
+        status=ChallengeCompletion.Status.VERIFIED,
+        verified_at__gte=month_ago,
+    ).count()
+
+    if recent_referrals >= MAX_REFERRALS_PER_MONTH:
+        return False, f"Monthly referral limit reached ({MAX_REFERRALS_PER_MONTH}/month)."
+
     return True, ""
 
 
@@ -79,15 +109,49 @@ def verify_instagram_share(user, challenge, evidence):
     return True, ""
 
 
+def verify_complete_profile(user, challenge, evidence):
+    """Reward for completing profile (display_name, biography, profile_picture)."""
+    if not user.display_name or user.display_name.strip() == user.username:
+        return False, "Set a display name different from your username."
+    if not user.biography or not user.biography.strip():
+        return False, "Add a biography to your profile."
+    if not user.profile_picture:
+        return False, "Upload a profile picture."
+    return True, ""
+
+
+def verify_first_generation(user, challenge, evidence):
+    """Reward for first successful AI generation."""
+    from imagegen.models import GeneratedImage
+    if not GeneratedImage.objects.filter(
+        user=user, status=GeneratedImage.Status.READY
+    ).exists():
+        return False, "Generate your first image to earn this reward."
+    return True, ""
+
+
+def verify_first_post(user, challenge, evidence):
+    """Reward for first published post."""
+    if not user.posts.exists():
+        return False, "Publish your first prompt to earn this reward."
+    return True, ""
+
+
 # The whole extension point of the reward system.
 VERIFIERS = {
     INVITE_FRIEND: verify_invite_friend,
     INSTAGRAM_SHARE: verify_instagram_share,
+    COMPLETE_PROFILE: verify_complete_profile,
+    FIRST_GENERATION: verify_first_generation,
+    FIRST_POST: verify_first_post,
 }
 
 # Verifiers that need the user to hand in something (a link) before they can
 # run.  Everything else is granted by the system when the event happens.
 EVIDENCE_VERIFIERS = {INSTAGRAM_SHARE}
+
+# Verifiers that require evidence but are not in EVIDENCE_VERIFIERS (e.g., invite_friend)
+EVIDENCE_REQUIRED_VERIFIERS = {INVITE_FRIEND}
 
 
 def earned_count(user, challenge) -> int:
@@ -97,7 +161,19 @@ def earned_count(user, challenge) -> int:
 
 
 def active_challenges():
-    return list(Challenge.objects.filter(is_active=True))
+    """Return challenges that are currently active and within their time window."""
+    now = timezone.now()
+    return list(
+        Challenge.objects.filter(
+            is_active=True
+        ).filter(
+            models.Q(type=ChallengeType.MISSION) |
+            models.Q(starts_at__isnull=True, ends_at__isnull=True) |
+            models.Q(starts_at__lte=now, ends_at__isnull=True) |
+            models.Q(starts_at__isnull=True, ends_at__gte=now) |
+            models.Q(starts_at__lte=now, ends_at__gte=now)
+        )
+    )
 
 
 def challenge_state(user) -> list[dict]:
@@ -105,6 +181,7 @@ def challenge_state(user) -> list[dict]:
     if user is None or not getattr(user, "is_authenticated", False):
         return []
 
+    now = timezone.now()
     challenges = active_challenges()
     if not challenges:
         return []
@@ -126,6 +203,13 @@ def challenge_state(user) -> list[dict]:
     for challenge in challenges:
         earned = counts.get(challenge.id, 0)
         capped = bool(challenge.max_rewards_per_user) and earned >= challenge.max_rewards_per_user
+        
+        # Check if challenge is currently open (time window)
+        is_open = challenge.is_open(now)
+        
+        # Check global cap
+        global_capped = not challenge.can_claim_globally()
+        
         state.append(
             {
                 "slug": challenge.slug,
@@ -133,14 +217,19 @@ def challenge_state(user) -> list[dict]:
                 "description": challenge.description,
                 "reward": challenge.reward_credits,
                 "earned": earned,
-                "complete": capped,
+                "complete": capped or global_capped or not is_open,
                 "needs_evidence": challenge.verifier in EVIDENCE_VERIFIERS,
+                "type": challenge.type,
+                "starts_at": challenge.starts_at.isoformat() if challenge.starts_at else None,
+                "ends_at": challenge.ends_at.isoformat() if challenge.ends_at else None,
+                "is_open": is_open,
+                "global_capped": global_capped,
             }
         )
     return state
 
 
-def complete_challenge(user, slug, evidence="", *, now=None):
+def complete_challenge(user, slug, evidence="", *, now=None, idempotency_key=""):
     """Verify a proof and pay the reward. Returns ``(completion, transaction)``.
 
     Raises ``ChallengeError`` when the challenge is unavailable, already paid,
@@ -150,9 +239,20 @@ def complete_challenge(user, slug, evidence="", *, now=None):
     """
     now = now or timezone.now()
 
-    challenge = Challenge.objects.filter(slug=slug, is_active=True).first()
-    if challenge is None:
+    challenge = Challenge.objects.filter(slug=slug).first()
+    if challenge is None or not challenge.is_active:
         raise ChallengeError("That challenge isn't available right now.", "unknown_challenge")
+
+    # Check time window (only for challenges, not missions)
+    if challenge.type == ChallengeType.CHALLENGE:
+        if challenge.starts_at and now < challenge.starts_at:
+            raise ChallengeError("This challenge hasn't started yet.", "not_started")
+        if challenge.ends_at and now >= challenge.ends_at:
+            raise ChallengeError("This challenge has ended.", "ended")
+
+    # Check global cap
+    if not challenge.can_claim_globally():
+        raise ChallengeError("This challenge has reached its global reward limit.", "global_cap_reached")
 
     if (
         challenge.max_rewards_per_user
@@ -165,14 +265,54 @@ def complete_challenge(user, slug, evidence="", *, now=None):
         raise ChallengeError("This challenge can't be verified yet.", "no_verifier")
 
     evidence = str(evidence or "").strip()[:500]
+    idempotency_key = str(idempotency_key or "").strip()[:64]
 
-    try:
-        with transaction.atomic():
+    # Handle idempotency key if provided
+    if idempotency_key:
+        try:
+            with transaction.atomic():
+                completion = ChallengeCompletion.objects.create(
+                    challenge=challenge,
+                    user=user,
+                    evidence=evidence,
+                    idempotency_key=idempotency_key,
+                )
+        except IntegrityError:
+            # Check if existing completion has same key
+            existing = ChallengeCompletion.objects.filter(
+                idempotency_key=idempotency_key
+            ).first()
+            if existing:
+                if existing.status == ChallengeCompletion.Status.VERIFIED:
+                    return existing, existing.reward_transaction
+                raise ChallengeError("You've already submitted that proof.", "duplicate") from None
+            raise ChallengeError("You've already submitted that proof.", "duplicate") from None
+    elif challenge.verifier in EVIDENCE_VERIFIERS | EVIDENCE_REQUIRED_VERIFIERS and evidence:
+        # For evidence-based challenges, enforce uniqueness on evidence
+        try:
+            with transaction.atomic():
+                completion = ChallengeCompletion.objects.create(
+                    challenge=challenge, user=user, evidence=evidence
+                )
+        except IntegrityError:
+            raise ChallengeError("You've already submitted that proof.", "duplicate") from None
+    else:
+        # For missions without evidence (or empty evidence), just create or get existing pending/rejected
+        completion = ChallengeCompletion.objects.filter(
+            challenge=challenge, user=user, evidence=evidence
+        ).first()
+        if not completion:
             completion = ChallengeCompletion.objects.create(
                 challenge=challenge, user=user, evidence=evidence
             )
-    except IntegrityError:
-        raise ChallengeError("You've already submitted that proof.", "duplicate") from None
+        elif completion.status == ChallengeCompletion.Status.VERIFIED:
+            # Already verified - this is the "already_earned" case but handled earlier
+            pass
+        elif completion.status == ChallengeCompletion.Status.REJECTED:
+            # Allow retry - reset to pending
+            completion.status = ChallengeCompletion.Status.PENDING
+            completion.detail = ""
+            completion.save(update_fields=["status", "detail"])
 
     try:
         ok, reason = verifier(user, challenge, evidence)
@@ -201,10 +341,16 @@ def complete_challenge(user, slug, evidence="", *, now=None):
 def on_first_generation(user):
     """Hook the generation flow calls after a user's first successful image.
 
-    Rewards the referrer, if there is one.  Deliberately swallow-all: a broken
-    referral must never fail the generation the user actually asked for.
+    Rewards the referrer, if there is one, provided the new user has spent
+    their own credits on a generation AND verified their email.
+    Deliberately swallow-all: a broken referral must never fail the generation
+    the user actually asked for.
     """
     if user is None or not getattr(user, "referred_by_id", None):
+        return None
+
+    # Invited user must have verified their email before referrer gets reward
+    if not user.is_verified:
         return None
 
     from imagegen.models import GeneratedImage
