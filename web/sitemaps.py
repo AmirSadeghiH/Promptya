@@ -118,7 +118,7 @@ def _published_posts():
     the sitemap even though their detail view correctly sends noindex.
     """
     return (
-        Post.objects.annotate(
+        Post.objects.visible().annotate(
             seo_title=Trim("title"),
             seo_description_length=Length("description"),
             seo_prompt_length=Length("prompt"),

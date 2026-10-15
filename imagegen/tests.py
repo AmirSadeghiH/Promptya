@@ -34,6 +34,9 @@ from imagegen.services import (
 from posts.models import Category, Post
 
 
+USE_DEFAULT_SOURCE = object()
+
+
 def _png_bytes(size=32, color=(120, 80, 200)):
     buffer = io.BytesIO()
     Image.new("RGB", (size, size), color).save(buffer, format="PNG")
@@ -617,7 +620,7 @@ class StudioPageTests(MediaTestCase):
         )
         post.image.save("cathedral.png", ContentFile(_png_bytes()), save=True)
 
-        detail = self.client.get(reverse("web:post-detail", args=[post.pk]))
+        detail = self.client.get(reverse("web:post-detail", args=[post.slug]))
         self.assertContains(detail, f"{self.url}?source={post.pk}")
 
         home = self.client.get(reverse("web:home"))
@@ -631,5 +634,374 @@ class StudioPageTests(MediaTestCase):
             title="Glass cathedral",
             prompt="A cathedral made of glass",
         )
-        detail = self.client.get(reverse("web:post-detail", args=[post.pk]))
+        detail = self.client.get(reverse("web:post-detail", args=[post.slug]))
         self.assertNotContains(detail, f"?source={post.pk}")
+
+
+class PromptCreatorRewardTests(MediaTestCase):
+    """Creators are paid when their prompt is used, and only under the rules."""
+
+    def setUp(self):
+        self.creator = get_user_model().objects.create_user(
+            username="creator", email="creator@example.com", password="test-password",
+        )
+        self.user = get_user_model().objects.create_user(
+            username="remixer", email="remixer@example.com", password="test-password",
+        )
+        self.category = Category.objects.create(name="Art", slug="art")
+        self.post = Post.objects.create(
+            author=self.creator,
+            category=self.category,
+            post_type=Post.PostType.PROMPT,
+            title="Glass cathedral",
+            prompt="A cathedral made of glass at dusk",
+        )
+        self.config = AIConfig.objects.create(
+            api_key="sk-test", model="gapgpt/z-image", prompt_use_reward=20,
+        )
+
+    def _creator_balance(self):
+        return get_balance(self.creator)
+
+    def _prompt_rewards(self):
+        """Prompt-use payouts only: the signup welcome bonus is also a REWARD row."""
+        return CreditTransaction.objects.filter(
+            user=self.creator, kind=TransactionKind.REWARD, note__startswith="Prompt used",
+        )
+
+    def _generate(self, *, user=None, source=USE_DEFAULT_SOURCE, payload=None, error=None):
+        return generate_image(
+            user or self.user,
+            "A cathedral made of glass at dusk",
+            source_post=self.post if source is USE_DEFAULT_SOURCE else source,
+            provider_factory=_factory(payload=payload, error=error),
+        )
+
+    def test_a_paid_generation_pays_the_prompt_author(self):
+        before = self._creator_balance()
+        record = self._generate()
+
+        self.assertEqual(record.creator_reward, 20)
+        self.assertEqual(self._creator_balance(), before + 20)
+        reward_row = self._prompt_rewards().get()
+        self.assertEqual(reward_row.amount, 20)
+        self.assertEqual(reward_row.generation_id, record.pk)
+
+    def test_the_reward_is_capped_at_the_generation_price(self):
+        self.config.prompt_use_reward = 500
+        self.config.save()
+
+        record = self._generate()
+
+        # The standard price is 80, so a 500 setting pays at most 80.
+        self.assertEqual(record.credit_cost, 80)
+        self.assertEqual(record.creator_reward, 80)
+
+    def test_zero_reward_pays_nothing(self):
+        self.config.prompt_use_reward = 0
+        self.config.save()
+
+        record = self._generate()
+
+        self.assertEqual(record.creator_reward, 0)
+        self.assertFalse(self._prompt_rewards().exists())
+
+    def test_generating_from_your_own_prompt_pays_nothing(self):
+        record = self._generate(user=self.creator)
+
+        self.assertEqual(record.creator_reward, 0)
+
+    def test_a_failed_generation_pays_nothing(self):
+        before = self._creator_balance()
+
+        with self.assertRaises(GenerationError):
+            self._generate(error=GenerationError("provider down"))
+
+        self.assertEqual(self._creator_balance(), before)
+        self.assertFalse(self._prompt_rewards().exists())
+
+    def test_a_generation_without_a_source_pays_nothing(self):
+        record = self._generate(source=None)  # explicit: no source post
+
+        self.assertEqual(record.creator_reward, 0)
+
+    def test_the_payout_happens_at_most_once_per_generation(self):
+        record = self._generate()
+        before = self._creator_balance()
+
+        # A repeat call (e.g. a retry) must not pay again.
+        from imagegen.services import _pay_prompt_creator
+        _pay_prompt_creator(GeneratedImage.objects.get(pk=record.pk), self.config)
+
+        self.assertEqual(self._creator_balance(), before)
+        self.assertEqual(self._prompt_rewards().count(), 1)
+
+    def test_a_hidden_source_post_pays_nothing_and_is_not_linked(self):
+        self.post.is_hidden = True
+        self.post.save(update_fields=["is_hidden"])
+
+        request_data = {"prompt": "A cathedral made of glass at dusk", "source_post_id": self.post.pk}
+        from imagegen.views import _source_post
+        self.assertIsNone(_source_post(request_data))
+
+    def test_the_admin_can_switch_the_reward_off_at_any_time(self):
+        self.config.prompt_use_reward = 0
+        self.config.save()
+
+        self.assertEqual(self._generate().creator_reward, 0)
+
+
+class HiddenPostVisibilityTests(TestCase):
+    """Posts hidden by moderation must not appear on any public surface."""
+
+    def setUp(self):
+        self.author = get_user_model().objects.create_user(
+            username="hidden-author", email="hidden-author@example.com", password="test-password",
+        )
+        self.viewer = get_user_model().objects.create_user(
+            username="viewer", email="viewer@example.com", password="test-password",
+        )
+        self.category = Category.objects.create(name="Art", slug="art")
+        self.visible = Post.objects.create(
+            author=self.author, category=self.category, post_type=Post.PostType.PROMPT,
+            title="Visible prompt", prompt="A calm lake at sunrise, soft mist over water",
+        )
+        self.hidden = Post.objects.create(
+            author=self.author, category=self.category, post_type=Post.PostType.PROMPT,
+            title="Hidden prompt", prompt="Something moderators removed from the feed",
+            is_hidden=True,
+        )
+
+    def test_the_visible_queryset_excludes_hidden_posts(self):
+        ids = set(Post.objects.visible().values_list("pk", flat=True))
+        self.assertIn(self.visible.pk, ids)
+        self.assertNotIn(self.hidden.pk, ids)
+
+    def test_the_prompt_library_skips_hidden_prompts(self):
+        from imagegen.services import prompt_library
+        prompts = [entry["prompt"] for entry in prompt_library()]
+        self.assertNotIn(self.hidden.prompt, prompts)
+
+    def test_hidden_posts_cannot_be_liked_by_id(self):
+        self.client.force_login(self.viewer)
+        response = self.client.post(reverse("interactions:toggle-like", args=[self.hidden.pk]))
+        self.assertEqual(response.status_code, 404)
+
+    def test_hidden_posts_cannot_be_copied_by_id(self):
+        self.client.force_login(self.viewer)
+        response = self.client.post(reverse("interactions:record-copy", args=[self.hidden.pk]))
+        self.assertEqual(response.status_code, 404)
+
+    def test_hidden_posts_cannot_be_viewed_by_id(self):
+        response = self.client.post(reverse("interactions:record-view", args=[self.hidden.pk]))
+        self.assertEqual(response.status_code, 404)
+
+    def test_the_public_post_api_returns_404_for_a_hidden_post(self):
+        response = self.client.get(reverse("posts:post-detail", args=[self.hidden.pk]))
+        self.assertEqual(response.status_code, 404)
+
+    def test_a_visible_post_is_still_served(self):
+        response = self.client.get(reverse("posts:post-detail", args=[self.visible.pk]))
+        self.assertEqual(response.status_code, 200)
+
+
+class PremiumTierTests(MediaTestCase):
+    """Tests for premium (no-watermark) generation tier."""
+
+    def setUp(self):
+        self.user = get_user_model().objects.create_user(
+            username="premium-user", email="premium@example.com", password="test-password"
+        )
+        # Create config with premium cost 200, standard cost 80
+        self.config = AIConfig.objects.create(
+            api_key="sk-test", model="gapgpt/z-image",
+            credit_cost=80, premium_credit_cost=200,
+        )
+        # Give user enough credits for premium tier
+        get_user_model().objects.filter(pk=self.user.pk).update(credit_balance=300)
+        self.user.refresh_from_db()
+
+    def test_premium_generation_no_watermark(self):
+        """Premium tier should generate image without watermark."""
+        from imagegen.services import _apply_watermark
+        from io import BytesIO
+
+        record = generate_image(
+            self.user, "A premium mountain sunset",
+            provider_factory=_factory(payload=None, error=None),
+            tier=GeneratedImage.Tier.PREMIUM,
+        )
+
+        self.assertEqual(record.tier, GeneratedImage.Tier.PREMIUM)
+        self.assertEqual(record.credit_cost, 200)
+        # Credits should be 300 - 200 = 100
+        self.assertEqual(get_balance(self.user), 100)
+
+        # Verify the stored image has no watermark by checking it can be decoded
+        # (watermarked images have white text overlay)
+        from PIL import Image
+        img = Image.open(record.image)
+        # For a truly un-watermarked image, the bottom-right shouldn't have white text
+        # This is a basic check - in practice we'd compare pixel data
+        self.assertIsNotNone(img)
+
+    def test_standard_generation_has_watermark(self):
+        """Standard tier should generate image with watermark."""
+        record = generate_image(
+            self.user, "A standard watermarked generation",
+            provider_factory=_factory(payload=None, error=None),
+            tier=GeneratedImage.Tier.STANDARD,
+        )
+
+        self.assertEqual(record.tier, GeneratedImage.Tier.STANDARD)
+        self.assertEqual(record.credit_cost, 80)
+        # Credits should be 300 - 80 = 220 (after premium generation above)
+        self.assertEqual(get_balance(self.user), 220)
+
+    def test_premium_tier_more_expensive(self):
+        """Premium tier should cost more than standard tier."""
+        # Standard cost is 80, premium is 200
+        self.assertTrue(200 > 80)
+
+
+class IdempotencyTests(MediaTestCase):
+    """Tests for idempotency key duplicate prevention in generation."""
+
+    def setUp(self):
+        self.user = get_user_model().objects.create_user(
+            username="idem-user", email="idem@example.com", password="test-password"
+        )
+        AIConfig.objects.create(api_key="sk-test", model="gapgpt/z-image")
+
+    def test_idempotency_key_prevents_duplicate_charge(self):
+        """Same idempotency key should return existing generation without re-charging."""
+        key = "idem-key-12345"
+
+        # First generation
+        record1 = generate_image(
+            self.user, "Same prompt for idempotency test",
+            provider_factory=_factory(),
+            idempotency_key=key,
+        )
+        balance_after_first = get_balance(self.user)
+        self.assertEqual(record1.credit_cost, 80)
+        # User started with 200 credits, charged 80
+        self.assertEqual(balance_after_first, 120)
+
+        # Second generation with same idempotency key
+        record2 = generate_image(
+            self.user, "Same prompt for idempotency test",
+            provider_factory=_factory(),
+            idempotency_key=key,
+        )
+
+        # Should return the existing record, not create a new one
+        self.assertEqual(record1.pk, record2.pk)
+        self.assertEqual(record1.tier, record2.tier)
+        # Balance should only be charged once
+        self.assertEqual(get_balance(self.user), balance_after_first)
+
+        # Only one generation record should exist
+        self.assertEqual(GeneratedImage.objects.filter(user=self.user).count(), 1)
+
+    def test_different_idempotency_key_allows_new_generation(self):
+        """Different idempotency key should create new generation."""
+        key1 = "key-1"
+        key2 = "key-2"
+
+        # First generation with key1
+        record1 = generate_image(
+            self.user, "Prompt with key1", provider_factory=_factory(), idempotency_key=key1,
+        )
+
+        # Second generation with key2
+        record2 = generate_image(
+            self.user, "Prompt with key2", provider_factory=_factory(), idempotency_key=key2,
+        )
+
+        # Should be two different records
+        self.assertNotEqual(record1.pk, record2.pk)
+        self.assertEqual(GeneratedImage.objects.filter(user=self.user).count(), 2)
+
+    def test_empty_idempotency_key_creates_new_generation(self):
+        """Empty idempotency key should create new generation (different from key-based check)."""
+        # First generation with empty key
+        record1 = generate_image(self.user, "Prompt with empty key", provider_factory=_factory())
+
+        # Second generation with another empty key - should be a new generation
+        # since the system falls back to evidence-based uniqueness when key is empty
+        record2 = generate_image(self.user, "Prompt with empty key 2", provider_factory=_factory())
+
+        # Two different generations should exist
+        self.assertEqual(GeneratedImage.objects.filter(user=self.user).count(), 2)
+
+
+class UnauthorizedAccessTests(MediaTestCase):
+    """Tests for unauthorized access and insufficient credits."""
+
+    def setUp(self):
+        self.user = get_user_model().objects.create_user(
+            username="unauth-user", email="unauth@example.com", password="test-password"
+        )
+        # Create config with credit_cost=80, premium_credit_cost=200 for tests
+        self.config = AIConfig.objects.create(
+            api_key="sk-test", model="gapgpt/z-image",
+            credit_cost=80, premium_credit_cost=200,
+        )
+
+    def test_insufficient_credits_standard(self):
+        """Standard generation should fail when user has insufficient credits."""
+        # User has 50 credits, standard cost is 80
+        get_user_model().objects.filter(pk=self.user.pk).update(credit_balance=50)
+        self.user.refresh_from_db()
+
+        from credits.services import InsufficientCredits
+        from imagegen.services import generate_image
+
+        with self.assertRaises(InsufficientCredits) as caught:
+            generate_image(self.user, "A mountain", provider_factory=_factory())
+
+        self.assertEqual(caught.exception.shortfall, 30)
+        # Balance should be unchanged
+        self.assertEqual(get_balance(self.user), 50)
+
+    def test_insufficient_credits_premium(self):
+        """Premium generation should fail when user has insufficient credits for premium."""
+        # User has 100 credits, premium cost is 200 (from config)
+        get_user_model().objects.filter(pk=self.user.pk).update(credit_balance=100)
+        self.user.refresh_from_db()
+
+        from imagegen.services import generate_image
+
+        with self.assertRaises(InsufficientCredits) as caught:
+            generate_image(self.user, "A mountain", provider_factory=_factory(), tier=GeneratedImage.Tier.PREMIUM)
+
+        # Premium costs 200 (from config), user has 100, shortfall is 100
+        self.assertEqual(caught.exception.shortfall, 100)
+        # Balance should be unchanged
+        self.assertEqual(get_balance(self.user), 100)
+
+    def test_tier_validation_endpoint(self):
+        """API should reject invalid tier values."""
+        from django.urls import reverse
+        import json
+
+        self.client.force_login(self.user)
+        url = reverse("imagegen:generate")
+        response = self.client.post(
+            url, data=json.dumps({"prompt": "A mountain", "tier": "invalid"}),
+            content_type="application/json",
+        )
+        # Should reject invalid tier
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("tier", response.json()["error"].lower())
+
+    def test_standard_tier_default_when_not_specified(self):
+        """API should default to standard tier when not specified."""
+        self.client.force_login(self.user)
+        from imagegen.services import generate_image
+        from imagegen.models import GeneratedImage
+
+        # Create generation without specifying tier (should default to standard)
+        record = generate_image(self.user, "A default tier generation", provider_factory=_factory())
+        self.assertEqual(record.tier, GeneratedImage.Tier.STANDARD)

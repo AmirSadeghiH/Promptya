@@ -240,6 +240,48 @@
       studio_download: "Download",
       studio_use_again: "Reuse prompt",
       login_to_generate: "Log in to generate",
+      // Standalone auth pages
+      forgot_password: "Forgot password?",
+      check_your_email: "Check your email",
+      verification_expires: "The link expires in 24 hours.",
+      back_to_login: "Back to login",
+      email_hint: "We'll send a 6-digit verification code to this address.",
+      // Email verification code
+      verify_code_title: "Verify your email",
+      verify_code_tagline: "We sent a 6-digit code to",
+      verify_code_need_email: "Enter your email address and the 6-digit code we sent to it.",
+      verify_code_label: "Verification code",
+      verify_code_hint: "The 6 digits from the email we just sent.",
+      verify_code_submit: "Verify code",
+      verify_code_expired: "This code has expired. Request a new one below.",
+      verify_code_locked: "Too many incorrect attempts. This code is no longer valid.",
+      verify_code_no_code: "We couldn't find an active code for this address. Request a new one below.",
+      verify_check_inbox: "Check your inbox — the code is valid for 2 minutes.",
+      verify_resend_btn: "Resend code",
+      verify_resend_cooldown: "New code available in {n}s",
+      verify_resend_note: "If the email exists and is unverified, a new code is on its way.",
+      verify_resend_sent: "A new code has been sent to your email.",
+      verify_resend_wait: "Your current code is still valid. You can request a new one when it expires.",
+      verify_link_retired_title: "This verification link is no longer valid",
+      verify_link_retired_body: "Promptya now verifies email with a short code instead of a link. Open the verification page and enter the code from your latest email, or request a new one.",
+      password_min_hint: "At least 8 characters.",
+      create_account_btn: "Create account",
+      show_password: "Show password",
+      hide_password: "Hide password",
+      // Password reset
+      reset_password_title: "Reset your password",
+      reset_password_tagline: "Enter your email address and we'll send you a link to reset your password.",
+      reset_email_hint: "We'll send a reset link to this address.",
+      send_reset_link: "Send reset link",
+      reset_email_sent: "We've sent you an email with a link to reset your password.",
+      reset_spam_note: "If you don't see the email, check your spam folder.",
+      set_new_password: "Set new password",
+      set_new_password_tagline: "Enter your new password below.",
+      reset_invalid_title: "Invalid reset link",
+      reset_invalid_body: "This password reset link is invalid or has expired. Please request a new one.",
+      request_new_link: "Request a new link",
+      reset_complete_title: "Password reset complete",
+      reset_complete_tagline: "Your password has been reset. You can now log in with your new password.",
       // date formatting
       date_locale: "en-US",
     },
@@ -480,6 +522,48 @@
       studio_download: "دانلود",
       studio_use_again: "استفادهٔ دوباره",
       login_to_generate: "برای ساخت وارد شوید",
+      // Standalone auth pages
+      forgot_password: "گذرواژه را فراموش کردید؟",
+      check_your_email: "ایمیل خود را بررسی کنید",
+      verification_expires: "این لینک ۲۴ ساعت اعتبار دارد.",
+      back_to_login: "بازگشت به ورود",
+      email_hint: "یک کد تأیید ۶ رقمی به این نشانی ارسال می‌شود.",
+      // کد تأیید ایمیل
+      verify_code_title: "تأیید ایمیل",
+      verify_code_tagline: "یک کد ۶ رقمی به این نشانی برای شما ارسال کردیم:",
+      verify_code_need_email: "ایمیلتان را به همراه کد ۶ رقمی که برایتان فرستادیم وارد کنید.",
+      verify_code_label: "کد تأیید",
+      verify_code_hint: "شش رقم داخل ایمیلی که همین الان برایتان فرستادیم را وارد کنید.",
+      verify_code_submit: "تأیید کد",
+      verify_code_expired: "این کد منقضی شده است. در پایین کد جدیدی درخواست دهید.",
+      verify_code_locked: "تلاش‌های نادرست زیادی. این کد دیگر معتبر نیست.",
+      verify_code_no_code: "کد فعالی برای این نشانی پیدا نشد. در پایین کد جدیدی درخواست دهید.",
+      verify_check_inbox: "به ایمیل‌بکس سر بزنید — کد تا ۲ دقیقه معتبر است.",
+      verify_resend_btn: "ارسال دوباره کد",
+      verify_resend_cooldown: "{n} ثانیه دیگر می‌توانید کد جدید درخواست دهید.",
+      verify_resend_note: "اگر این ایمیل موجود باشد و تأیید نشده باشد، کد جدیدی در حال ارسال است.",
+      verify_resend_sent: "یک کد جدید به ایمیل شما ارسال شد.",
+      verify_resend_wait: "کد فعلی شما هنوز معتبر است. پس از منقضی‌شدن می‌توانید کد جدیدی درخواست دهید.",
+      verify_link_retired_title: "این لینک تأیید دیگر معتبر نیست",
+      verify_link_retired_body: "پرامپتیا اکنون ایمیل را با یک کد کوتاه به‌جای لینک تأیید می‌کند. صفحهٔ تأیید را باز کنید، کد ایمیل آخر خود را وارد کنید یا کد جدیدی درخواست دهید.",
+      password_min_hint: "حداقل ۸ نویسه.",
+      create_account_btn: "ایجاد حساب",
+      show_password: "نمایش گذرواژه",
+      hide_password: "پنهان کردن گذرواژه",
+      // بازنشانی گذرواژه
+      reset_password_title: "بازنشانی گذرواژه",
+      reset_password_tagline: "آدرس ایمیل خود را وارد کنید تا لینک بازنشانی گذرواژه برای شما ارسال شود.",
+      reset_email_hint: "لینک بازنشانی به این نشانی ارسال می‌شود.",
+      send_reset_link: "ارسال لینک بازنشانی",
+      reset_email_sent: "ایمیلی با لینک بازنشانی گذرواژه برای شما ارسال شد.",
+      reset_spam_note: "اگر ایمیل را نمی‌بینید، پوشهٔ اسپم را بررسی کنید.",
+      set_new_password: "تعیین گذرواژهٔ جدید",
+      set_new_password_tagline: "گذرواژهٔ جدید خود را در زیر وارد کنید.",
+      reset_invalid_title: "لینک بازنشانی نامعتبر است",
+      reset_invalid_body: "این لینک بازنشانی گذرواژه نامعتبر یا منقضی شده است. لطفاً لینک جدیدی درخواست دهید.",
+      request_new_link: "درخواست لینک جدید",
+      reset_complete_title: "بازنشانی گذرواژه کامل شد",
+      reset_complete_tagline: "گذرواژهٔ شما بازنشانی شد. اکنون می‌توانید با گذرواژهٔ جدید وارد شوید.",
       // date formatting
       date_locale: "fa-IR",
     },
@@ -545,14 +629,28 @@
   function switchLanguage(lang) {
     currentLang = (lang === "fa" || lang === "en") ? lang : (currentLang === "fa" ? "en" : "fa");
     persist(currentLang);
+    // The server renders the page in the URL's language, and the URL prefix
+    // outranks the cookie. So the switch must navigate to the other language's
+    // address. A reload here would keep the old /en/ prefix and do nothing.
+    var target = currentToggleHref();
+    var rendered = document.documentElement.getAttribute("lang");
+    if (target && rendered !== lang) {
+      window.location.assign(target);
+      return;
+    }
     applyStatic();
     if (typeof global.promptyaApplyPageI18n === "function") global.promptyaApplyPageI18n();
     window.dispatchEvent(new CustomEvent("promptya:langchange", { detail: { lang: currentLang } }));
-    // Chrome text above is translated client-side, but every server-rendered
-    // string (post titles, categories, follow buttons, dates) exists only in
-    // the page's render language. Reload so Django re-renders the whole page;
-    // persist() already wrote the cookie the context processor reads.
+    // Fallback for pages without a server-provided counterpart: reload so Django
+    // re-renders the whole page; persist() already wrote the cookie.
     window.location.reload();
+  }
+
+  // The same page in the other language, as rendered by the server. Every
+  // toggle carries it, so reading the first one is enough.
+  function currentToggleHref() {
+    var toggle = document.querySelector(".js-lang-toggle[data-lang-href]");
+    return toggle ? toggle.getAttribute("data-lang-href") : null;
   }
 
   var currentLang = "en";

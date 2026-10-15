@@ -155,7 +155,9 @@ class UrlStrategyTests(SeoTestCase):
     def test_old_numeric_post_url_redirects_to_slug(self):
         response = self.fetch(f"/en/post/{self.post.pk}/")
         self.assertEqual(response.status_code, 301)
-        self.assertEqual(response["Location"], f"{ORIGIN}/en/post/{self.post.slug}/")
+        # Django's redirect() is a site-relative Location; the origin is only
+        # added to emitted *structured data* and canonicals, not to redirects.
+        self.assertEqual(response["Location"], f"/en/post/{self.post.slug}/")
 
     def test_slug_post_url_is_canonical(self):
         html = self.get(f"/en/post/{self.post.slug}/")

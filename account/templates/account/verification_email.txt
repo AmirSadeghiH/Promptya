@@ -1,13 +1,16 @@
-{% load i18n %}{% trans "Verify your email address" %}
+{% load i18n %}{% trans "Your Promptya verification code" %}
 
 {% blocktrans with name=user.display_label %}Hi {{ name }},{% endblocktrans %}
 
-{% trans "Thanks for joining Promptya! Please visit the link below to verify your email address and activate your account:" %}
+{% trans "Use this 6-digit code to verify your email address:" %}
 
+{{ code }}
+
+{% trans "It expires in 2 minutes and can be used once." %}
+
+{% trans "Enter the code here:" %}
 {{ verify_url }}
 
-{% trans "This link expires in 24 hours and can only be used once." %}
-
-{% trans "If you didn't create an account on Promptya, you can safely ignore this email." %}
+{% trans "If you didn't create an account on Promptya, you can safely ignore this email. Never share this code with anyone." %}
 
 — {% trans "The Promptya Team" %}

@@ -15,7 +15,7 @@ from datetime import timedelta
 from django.db import IntegrityError, models, transaction
 from django.utils import timezone
 
-from credits.models import Challenge, ChallengeCompletion, CreditTransaction, TransactionKind, ChallengeType
+from credits.models import Challenge, ChallengeCompletion, ChallengeType
 from credits.services import reward
 
 INVITE_FRIEND = "invite_friend"
@@ -68,13 +68,13 @@ def verify_invite_friend(user, challenge, evidence):
     if not invited.is_verified:
         return False, "Your friend hasn't verified their email address yet."
 
-    # Check that the invited user has at least one successful generation
-    # that was NOT refunded (i.e., they actually spent credits).
-    # A generation charge (GENERATION transaction) that wasn't refunded means
-    # they used their own credits (signup bonus or earned).
-    has_real_generation = CreditTransaction.objects.filter(
+    # The invited user must have a READY generation. A GENERATION charge row
+    # alone is not proof: the charge is written before the provider runs and is
+    # refunded when the attempt fails, so a failed attempt would otherwise count.
+    has_real_generation = GeneratedImage.objects.filter(
         user=invited,
-        kind=TransactionKind.GENERATION,
+        status=GeneratedImage.Status.READY,
+        credit_cost__gt=0,
     ).exists()
 
     if not has_real_generation:

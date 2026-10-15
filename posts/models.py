@@ -40,7 +40,7 @@ class Category(models.Model):
 
     @property
     def public_post_count(self):
-        return self.posts.count()
+        return self.posts.visible().count()
 
     @property
     def is_indexable(self):
@@ -70,7 +70,7 @@ class Tag(models.Model):
 
     @property
     def post_count(self):
-        return self.posts.count()
+        return self.posts.visible().count()
 
     @property
     def is_indexable(self):
@@ -83,7 +83,19 @@ class Tag(models.Model):
         return self.post_count >= MIN_INDEXABLE_COLLECTION_ITEMS
 
 
+class PostQuerySet(models.QuerySet):
+    def visible(self):
+        """Posts the public may see: everything not hidden by moderation.
+
+        Admin views use the plain manager on purpose, so moderators can still
+        find and unhide a hidden post.
+        """
+        return self.filter(is_hidden=False)
+
+
 class Post(models.Model):
+
+    objects = PostQuerySet.as_manager()
 
     class PostType(models.TextChoices):
         PROMPT = "prompt", "Prompt"

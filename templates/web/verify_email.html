@@ -1,0 +1,86 @@
+{% extends "web/auth_base_new.html" %}
+{% load static i18n %}
+{% block title %}{% trans "Verify your email" %} · Promptya{% endblock %}
+
+{% block auth_content %}
+  <header class="auth-card-head">
+    <h1 id="auth-title" class="auth-title" data-i18n="verify_code_title">{% trans "Verify your email" %}</h1>
+    {% if mode == "session" %}
+      <p class="auth-subtitle">
+        <span data-i18n="verify_code_tagline">{% trans "We sent a 6-digit code to" %}</span>
+        <strong class="auth-email" dir="ltr">{{ email }}</strong>
+      </p>
+    {% else %}
+      <p class="auth-subtitle" data-i18n="verify_code_need_email">{% trans "Enter your email address and the 6-digit code we sent to it." %}</p>
+    {% endif %}
+  </header>
+
+  {% if error %}
+    <div class="auth-alert" role="alert">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+      <span>{{ error }}</span>
+    </div>
+  {% endif %}
+
+  {% if mode == "session" and state == "expired" %}
+    <p class="auth-note" data-i18n="verify_code_expired">{% trans "This code has expired. Request a new one below." %}</p>
+  {% elif mode == "session" and state == "locked" %}
+    <p class="auth-note" data-i18n="verify_code_locked">{% trans "Too many incorrect attempts. This code is no longer valid." %}</p>
+  {% elif mode == "session" and state == "no_code" %}
+    <p class="auth-note" data-i18n="verify_code_no_code">{% trans "We couldn't find an active code for this address. Request a new one below." %}</p>
+  {% elif mode == "session" and state == "fresh" and not notice %}
+    <p class="auth-note" data-i18n="verify_check_inbox">{% trans "Check your inbox — the code is valid for 2 minutes." %}</p>
+  {% endif %}
+
+  {% if notice == "resent" %}
+    {% if mode == "session" %}
+      <p class="auth-note" data-i18n="verify_resend_sent">{% trans "A new code has been sent to your email." %}</p>
+    {% else %}
+      <p class="auth-note" data-i18n="verify_resend_note">{% trans "If the email exists and is unverified, a new code is on its way." %}</p>
+    {% endif %}
+  {% elif notice == "wait" %}
+    <p class="auth-note" data-i18n="verify_resend_wait">{% trans "Your current code is still valid. You can request a new one when it expires." %}</p>
+  {% endif %}
+
+  <form method="post" class="auth-form" action="{% url 'verify-email' %}">
+    {% csrf_token %}
+
+    {% if mode == "fallback" %}
+      <div class="field">
+        <label class="field-label" for="verify-email-address" data-i18n="email">{% trans "Email" %}</label>
+        <div class="field-wrapper">
+          <svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+          <input id="verify-email-address" class="field-input" type="email" name="email" required
+                 autocomplete="email" autocapitalize="none" spellcheck="false" inputmode="email" dir="ltr">
+        </div>
+      </div>
+    {% endif %}
+
+    <div class="field">
+      <label class="field-label" for="verify-code" data-i18n="verify_code_label">{% trans "Verification code" %}</label>
+      <div class="field-wrapper">
+        <input id="verify-code" class="field-input otp-input" type="text" name="code" required
+               inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="one-time-code"
+               dir="ltr" aria-describedby="verify-code-hint">
+      </div>
+      <span id="verify-code-hint" class="field-hint" data-i18n="verify_code_hint">{% trans "The 6 digits from the email we just sent." %}</span>
+    </div>
+
+    <button type="submit" class="btn btn-primary btn-lg auth-submit">
+      <span class="auth-submit-label" data-i18n="verify_code_submit">{% trans "Verify code" %}</span>
+      <span class="auth-spinner" aria-hidden="true"></span>
+    </button>
+  </form>
+
+  <form method="post" class="auth-form" action="{% url 'verify-email-resend' %}">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-outline btn-lg auth-block" id="verify-resend"
+      {% if resend_at %}data-resend-at="{{ resend_at }}"{% endif %}>
+      <span class="auth-submit-label" data-i18n="verify_resend_btn">{% trans "Resend code" %}</span>
+    </button>
+  </form>
+
+  <p class="auth-switch">
+    <a class="auth-link" href="{% url 'login' %}" data-i18n="back_to_login">{% trans "Back to login" %}</a>
+  </p>
+{% endblock %}

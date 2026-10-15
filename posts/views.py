@@ -5,7 +5,6 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from django.db.models import Count, Q
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
-from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
 from posts.models import Category, Post, Tag
@@ -304,7 +303,6 @@ def _validate_post_payload(data, *, partial=False):
 
 
 @login_required
-@csrf_exempt
 @require_POST
 def post_create(request):
     content_type = request.content_type or ""

@@ -17,7 +17,7 @@ from posts.services import post_list_queryset, serialize_post
 
 def _get_post_or_error(post_id):
     try:
-        return Post.objects.get(pk=post_id), None
+        return Post.objects.visible().get(pk=post_id), None
     except Post.DoesNotExist:
         return None, JsonResponse({"error": "Post not found."}, status=404)
 
@@ -57,7 +57,7 @@ def record_copy(request, post_id):
 @require_POST
 @transaction.atomic
 def toggle_like(request, post_id):
-    post = get_object_or_404(Post, pk=post_id)
+    post = get_object_or_404(Post.objects.visible(), pk=post_id)
 
     like, created = Like.objects.get_or_create(user=request.user, post=post)
     if not created:
@@ -77,7 +77,7 @@ def toggle_like(request, post_id):
 @require_POST
 @transaction.atomic
 def toggle_save(request, post_id):
-    post = get_object_or_404(Post, pk=post_id)
+    post = get_object_or_404(Post.objects.visible(), pk=post_id)
 
     save, created = Save.objects.get_or_create(user=request.user, post=post)
     if not created:

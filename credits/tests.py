@@ -596,9 +596,9 @@ class IdempotencyKeyTests(TestCase):
         self.friend.referred_by = self.user
         self.friend.save(update_fields=["referred_by"])
         GeneratedImage.objects.create(
-            user=self.friend, prompt="A mountain", status=GeneratedImage.Status.READY
+            user=self.friend, prompt="A mountain", status=GeneratedImage.Status.READY,
+            credit_cost=80,
         )
-        from credits.services import charge
         charge(self.friend, 80, note="AI generation")
 
     def test_idempotency_key_prevents_duplicate_submission(self):

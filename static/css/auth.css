@@ -1,0 +1,451 @@
+/* ==========================================================================
+   Standalone auth pages: login, sign-up, email verification.
+   Loaded after app.css by templates/web/auth_base_new.html. These pages render
+   without the app chrome, so every rule here is scoped to .auth-body.
+   ========================================================================== */
+
+.auth-body {
+  position: relative;
+  min-height: 100vh;
+  min-height: 100dvh;
+  margin: 0;
+  overflow-x: hidden;
+  background: var(--bg);
+}
+
+/* Ambient glow behind the card. Decorative only, non-interactive. */
+.auth-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+.auth-orb {
+  position: absolute;
+  width: min(70vw, 520px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  filter: blur(90px);
+  opacity: 0.32;
+}
+.auth-orb-1 {
+  top: -24%;
+  inset-inline-start: -18%;
+  background: #7c5cff;
+}
+.auth-orb-2 {
+  bottom: -28%;
+  inset-inline-end: -16%;
+  background: #22d3ee;
+  opacity: 0.2;
+}
+:root[data-theme="light"] .auth-orb {
+  opacity: 0.16;
+}
+
+.auth-shell {
+  position: relative;
+  z-index: 1;
+  min-height: inherit;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  padding: var(--sp-5) var(--sp-5) var(--sp-5);
+}
+
+.auth-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  width: 100%;
+  max-width: 440px;
+  margin: 0 auto;
+}
+
+.auth-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: var(--fs-lg);
+  font-weight: 700;
+  letter-spacing: var(--tracking-tight);
+  color: var(--text);
+}
+.auth-brand img {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+}
+
+.auth-utility {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.auth-main {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--sp-6) 0;
+}
+
+/* The card. app.css defines a generic .auth-card; these rules win by order. */
+.auth-body .auth-card {
+  width: 100%;
+  max-width: 440px;
+  margin: 0;
+  padding: var(--sp-8);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-5);
+  background: color-mix(in srgb, var(--bg-card) 90%, transparent);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-3);
+}
+
+.auth-card-head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  text-align: center;
+}
+.auth-body .auth-card .auth-title {
+  margin: 0;
+  font-size: var(--fs-2xl);
+  font-weight: 700;
+  line-height: var(--lh-tight);
+  letter-spacing: var(--tracking-tight);
+}
+.auth-subtitle {
+  margin: 0;
+  font-size: var(--fs-md);
+  line-height: var(--lh-body);
+  color: var(--text-secondary);
+}
+
+.auth-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-3);
+  padding: 0.75rem 0.9rem;
+  border-radius: var(--radius-md);
+  background: var(--danger-soft-bg);
+  border: 1px solid var(--danger-soft-border);
+  color: var(--danger-text);
+  font-size: var(--fs-base);
+  line-height: var(--lh-body);
+}
+.auth-alert .icon {
+  width: 18px;
+  height: 18px;
+  margin-top: 0.15rem;
+}
+
+/* Form */
+.auth-body .auth-form {
+  max-width: none;
+  gap: var(--sp-5);
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+.field-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+}
+.field-label {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+.field-forgot {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--accent-text);
+}
+.field-forgot:hover,
+.auth-link:hover {
+  text-decoration: underline;
+}
+.field-hint {
+  font-size: var(--fs-xs);
+  line-height: var(--lh-snug);
+  color: var(--text-muted);
+}
+.field-error {
+  font-size: var(--fs-xs);
+  line-height: var(--lh-snug);
+  color: var(--danger-text);
+}
+
+.field-wrapper {
+  position: relative;
+}
+.field-icon {
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-start: 0.9rem;
+  transform: translateY(-50%);
+  width: 18px;
+  height: 18px;
+  color: var(--text-muted);
+  pointer-events: none;
+  transition: color var(--dur-2) var(--ease);
+}
+.field-wrapper:focus-within .field-icon {
+  color: var(--accent);
+}
+
+/* padding-inline-start clears the leading icon; padding-inline-end clears the
+   reveal button on password fields. Logical properties keep RTL correct. */
+.field-input {
+  width: 100%;
+  min-height: 50px;
+  padding: 0.75rem 1rem;
+  padding-inline: 2.75rem 1rem;
+  font-size: 1rem; /* 16px stops iOS from zooming the viewport on focus */
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+  border-color: var(--border-strong);
+}
+.field-input.has-toggle {
+  padding-inline-end: 2.9rem;
+}
+.field-input:hover:not(:focus) {
+  border-color: var(--text-muted);
+}
+.field-input:focus {
+  border-color: var(--accent);
+  background: var(--bg-card);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.field-toggle {
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-end: 0.35rem;
+  transform: translateY(-50%);
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  transition: background var(--dur-2) var(--ease), color var(--dur-2) var(--ease);
+}
+.field-toggle:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+.field-toggle .icon {
+  width: 18px;
+  height: 18px;
+}
+.field-toggle .toggle-hide,
+.field-toggle[aria-pressed="true"] .toggle-show {
+  display: none;
+}
+.field-toggle[aria-pressed="true"] .toggle-hide {
+  display: block;
+}
+
+/* Password strength: four bars, coloured by the level the script sets. */
+.password-strength {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  margin-top: 0.1rem;
+  --strength-color: var(--text-muted);
+}
+.password-strength[data-level="1"] { --strength-color: var(--danger); }
+.password-strength[data-level="2"] { --strength-color: var(--warning); }
+.password-strength[data-level="3"] { --strength-color: var(--success); }
+.password-strength[data-level="4"] { --strength-color: var(--accent-text); }
+.strength-bars {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.3rem;
+}
+.strength-bars span {
+  height: 4px;
+  border-radius: var(--radius-pill);
+  background: var(--border-strong);
+  transition: background var(--dur-2) var(--ease);
+}
+.strength-bars span.is-on {
+  background: var(--strength-color);
+}
+.strength-label {
+  min-width: 3.6rem;
+  text-align: end;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--strength-color);
+}
+
+/* Submit */
+.auth-submit {
+  position: relative;
+  width: 100%;
+  min-height: 52px;
+  font-size: var(--fs-md);
+}
+.auth-submit-label {
+  transition: opacity var(--dur-2) var(--ease);
+}
+.auth-spinner {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2.5px solid currentColor;
+  border-top-color: transparent;
+  opacity: 0;
+}
+.auth-submit.is-loading,
+.auth-submit.is-loading:disabled {
+  opacity: 0.85;
+  cursor: progress;
+}
+.auth-submit.is-loading .auth-submit-label {
+  opacity: 0;
+}
+.auth-submit.is-loading .auth-spinner {
+  opacity: 1;
+  animation: auth-spin 0.7s linear infinite;
+}
+@keyframes auth-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.auth-block {
+  width: 100%;
+}
+
+.auth-switch {
+  margin: 0;
+  text-align: center;
+  font-size: var(--fs-base);
+  color: var(--text-secondary);
+}
+.auth-link {
+  color: var(--accent-text);
+  font-weight: 600;
+}
+
+/* Verification page */
+.auth-success-icon {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  margin: 0 auto;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--success) 14%, transparent);
+  color: var(--success);
+}
+.auth-success-icon .icon {
+  width: 32px;
+  height: 32px;
+}
+.auth-note {
+  margin: 0;
+  text-align: center;
+  font-size: var(--fs-base);
+  line-height: var(--lh-body);
+  color: var(--text-secondary);
+}
+.auth-email {
+  display: inline-block;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  color: var(--text);
+}
+
+.auth-footer {
+  padding-top: var(--sp-5);
+  text-align: center;
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+}
+.auth-footer p {
+  margin: 0;
+}
+
+/* Responsive: one column everywhere, density adjusted per screen size. */
+@media (max-width: 640px) {
+  .auth-shell {
+    padding: var(--sp-4) var(--sp-4) var(--sp-4);
+  }
+  .auth-main {
+    align-items: flex-start;
+    padding: var(--sp-4) 0;
+  }
+  .auth-body .auth-card {
+    padding: var(--sp-6) var(--sp-5);
+    border-radius: var(--radius-lg);
+  }
+  .auth-body .auth-card .auth-title {
+    font-size: var(--fs-xl);
+  }
+}
+
+@media (max-width: 360px) {
+  .auth-body .auth-card {
+    padding: var(--sp-5) var(--sp-4);
+  }
+  .field-label-row {
+    flex-wrap: wrap;
+  }
+}
+
+@media (min-width: 1024px) {
+  .auth-body .auth-card {
+    padding: var(--sp-9);
+  }
+  .auth-body .auth-card .auth-title {
+    font-size: var(--fs-3xl);
+  }
+}
+
+@media (max-height: 560px) and (orientation: landscape) {
+  .auth-main {
+    align-items: flex-start;
+  }
+}
+
+/* 6-digit verification code input: large (well above the 16px iOS-zoom
+   threshold), centered, and forced LTR so RTL pages never mirror it. */
+.auth-body .field-input.otp-input {
+  font-size: 1.75rem;
+  text-align: center;
+  direction: ltr;
+  letter-spacing: 0.45em;
+  font-family: var(--mono);
+  padding: 0.75rem 1rem;
+}
+
+/* The resend button while the server-anchored code is still unexpired. */
+.auth-body .btn:disabled {
+  opacity: .55;
+  cursor: not-allowed;
+}

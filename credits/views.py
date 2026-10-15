@@ -4,7 +4,6 @@ import json
 
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
-from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
 from core.ratelimit import rate_limit_user
@@ -31,7 +30,6 @@ def _wallet(user):
 
 @login_required
 @rate_limit_user("claim_challenge", limit=20, window_seconds=3600, error_message="Too many challenge claims. Try again later.")
-@csrf_exempt
 @require_POST
 def claim_challenge(request, slug):
     data = _parse_body(request)

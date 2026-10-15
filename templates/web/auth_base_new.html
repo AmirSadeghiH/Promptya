@@ -1,0 +1,84 @@
+{% load static i18n %}<!DOCTYPE html>
+<html lang="{{ lang }}" dir="{{ dir }}" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="dark light">
+  <meta name="theme-color" content="#0a0a0f">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="robots" content="noindex, nofollow">
+
+  <title>{% block title %}Promptya{% endblock %}</title>
+
+  <link rel="manifest" href="{% static 'manifest.webmanifest' %}">
+  <link rel="icon" href="{% static 'icons/favicon.ico' %}" sizes="any">
+  <link rel="icon" type="image/png" sizes="192x192" href="{% static 'icons/icon-192.png' %}">
+  <link rel="apple-touch-icon" sizes="180x180" href="{% static 'icons/apple-touch-icon.png' %}">
+  <meta name="application-name" content="Promptya">
+  <meta name="apple-mobile-web-app-title" content="Promptya">
+  <meta name="mobile-web-app-capable" content="yes">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Vazirmatn:wght@400;500;600;700&family=JetBrains+Mono:wght@400&display=swap">
+  <link rel="stylesheet" href="{% static 'css/app.css' %}">
+  <link rel="stylesheet" href="{% static 'css/auth.css' %}">
+
+  <script>
+    (function () {
+      function cookieTheme() {
+        var m = document.cookie.match(/(?:^|;\s*)promptya-theme=(dark|light)(?:;|$)/);
+        return m ? m[1] : null;
+      }
+      var theme = null;
+      try { theme = localStorage.getItem("promptya-theme"); } catch (e) {}
+      theme = theme || cookieTheme();
+      if (theme !== "dark" && theme !== "light") {
+        theme = window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+      }
+      document.documentElement.setAttribute("data-theme", theme);
+      var meta = document.querySelector('meta[name="theme-color"]');
+      if (meta) meta.setAttribute("content", theme === "light" ? "#f6f6f9" : "#0a0a0f");
+    })();
+  </script>
+</head>
+<body class="auth-body">
+  <a class="skip-link" href="#auth-main">{{ i18n.skip_to_content }}</a>
+
+  <div class="auth-bg" aria-hidden="true">
+    <span class="auth-orb auth-orb-1"></span>
+    <span class="auth-orb auth-orb-2"></span>
+  </div>
+
+  <div class="auth-shell">
+    <header class="auth-topbar">
+      <a class="auth-brand" href="{% url 'web:home' %}" aria-label="Promptya">
+        <img src="{% static 'icons/icon-192.png' %}" alt="" width="34" height="34" decoding="async">
+        <span>Promptya</span>
+      </a>
+      <div class="auth-utility">
+        {% include "web/partials/theme_toggle.html" with id="auth-theme-toggle" %}
+        <button class="lang-btn js-lang-toggle" type="button" data-lang-href="{{ lang_switch_url }}" aria-label="{{ i18n.switch_language }}">
+          <span>{{ i18n.lang_switch_label }}</span>
+        </button>
+      </div>
+    </header>
+
+    <main id="auth-main" class="auth-main" tabindex="-1">
+      <section class="auth-card" aria-labelledby="auth-title">
+        {% block auth_content %}{% endblock %}
+      </section>
+    </main>
+
+    <footer class="auth-footer">
+      <p>&copy; {% now "Y" %} Promptya &middot; <span data-i18n="footer_rights">{{ i18n.footer_rights }}</span></p>
+    </footer>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script>window.PROMPTYA_LANG = "{{ lang }}";</script>
+  <script src="{% static 'js/i18n.js' %}" defer></script>
+  <script src="{% static 'js/theme.js' %}" defer></script>
+  <script src="{% static 'js/auth.js' %}" defer></script>
+</body>
+</html>

@@ -1,16 +1,13 @@
-{% comment %}
-Weather switch: the one memorable control in the chrome. Every copy carries
-.js-theme-toggle, so theme.js wires and re-labels all of them.
-
-Param: id — REQUIRED and unique. The topbar, drawer and footer each render a
-copy, and duplicate ids would break both a11y and the label lookup.
-
-Note: use a block comment for notes like this. A `{# ... #}` comment is
-single-line only — wrapping one across two lines renders it as visible text.
-{% endcomment %}
-<button id="{{ id }}" class="theme-toggle js-theme-toggle" type="button"
-        aria-label="{{ i18n.toggle_theme }}" title="{{ i18n.toggle_theme }}" aria-pressed="false">
-  <span class="theme-toggle-stars" aria-hidden="true"></span>
-  <span class="theme-toggle-cloud" aria-hidden="true"></span>
-  <span class="theme-toggle-thumb" aria-hidden="true"></span>
+<button
+  id="{{ id }}"
+  class="theme-toggle js-theme-toggle"
+  type="button"
+  aria-label="{{ i18n.toggle_theme }}"
+  title="{{ i18n.toggle_theme }}"
+  aria-pressed="false"
+>
+  <span class="theme-toggle-thumb" aria-hidden="true">
+    <svg class="theme-toggle-icon theme-toggle-icon-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 14.2A8.5 8.5 0 0 1 9.8 3.5a8.5 8.5 0 1 0 10.7 10.7z"/></svg>
+    <svg class="theme-toggle-icon theme-toggle-icon-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.2M12 19.3v2.2M4.9 4.9l1.6 1.6M17.5 17.5l1.6 1.6M2.5 12h2.2M19.3 12h2.2M4.9 19.1l1.6-1.6M17.5 6.5l1.6-1.6"/></svg>
+  </span>
 </button>

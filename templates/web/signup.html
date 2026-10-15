@@ -1,26 +1,30 @@
-{% extends "web/base.html" %}
+{% extends "web/auth_base.html" %}
+{% load i18n %}
 {% block title %}{{ i18n.signup }} · Promptya{% endblock %}
-{% block robots %}<meta name="robots" content="noindex, follow">{% endblock %}
 
-{% block content %}
-<div class="auth-card">
-  <h1 data-i18n="create_account">{{ i18n.create_account }}</h1>
-  <p class="muted" data-i18n="signup_tagline">{{ i18n.signup_tagline }}</p>
-  {% if error %}<div class="form-error">{{ error }}</div>{% endif %}
-  <form method="post" class="auth-form">
+{% block auth_content %}
+  <h1 id="auth-title" class="auth-title" data-i18n="create_account">{{ i18n.create_account }}</h1>
+  <p class="auth-lede muted" data-i18n="signup_tagline">{{ i18n.signup_tagline }}</p>
+
+  {% if error %}<div class="auth-alert" role="alert">{{ error }}</div>{% endif %}
+
+  <form method="post" class="auth-form" novalidate>
     {% csrf_token %}
     {% if ref %}<input type="hidden" name="ref" value="{{ ref }}">{% endif %}
-    <label class="field"><span data-i18n="username">{{ i18n.username }}</span>
-      <input type="text" name="username" required minlength="3" maxlength="150" autocomplete="username">
-    </label>
-    <label class="field"><span data-i18n="email">{{ i18n.email }}</span>
-      <input type="email" name="email" required autocomplete="email">
-    </label>
-    <label class="field"><span data-i18n="password_min">{{ i18n.password_min }} <small data-i18n="password_hint">{{ i18n.password_hint }}</small></span>
-      <input type="password" name="password" required minlength="8" autocomplete="new-password">
-    </label>
-    <button class="btn btn-primary btn-lg" type="submit" data-i18n="signup">{{ i18n.signup }}</button>
+    <div class="field">
+      <label for="signup-username" data-i18n="username">{{ i18n.username }}</label>
+      <input id="signup-username" type="text" name="username" required minlength="3" maxlength="150" autocomplete="username" autocapitalize="none" spellcheck="false">
+    </div>
+    <div class="field">
+      <label for="signup-email" data-i18n="email">{{ i18n.email }}</label>
+      <input id="signup-email" type="email" name="email" required autocomplete="email" autocapitalize="none" spellcheck="false" inputmode="email">
+    </div>
+    <div class="field">
+      <label for="signup-password"><span data-i18n="password_min">{{ i18n.password_min }}</span> <small class="muted" data-i18n="password_hint">{{ i18n.password_hint }}</small></label>
+      <input id="signup-password" type="password" name="password" required minlength="8" autocomplete="new-password">
+    </div>
+    <button class="btn btn-primary btn-block btn-lg" type="submit" data-i18n="signup">{{ i18n.signup }}</button>
   </form>
-  <p class="muted"><span data-i18n="have_account">{{ i18n.have_account }}</span> <a href="{% url 'login' %}" data-i18n="login">{{ i18n.login }}</a></p>
-</div>
+
+  <p class="auth-switch"><span data-i18n="have_account">{{ i18n.have_account }}</span> <a href="{% url 'login' %}" data-i18n="login">{{ i18n.login }}</a></p>
 {% endblock %}

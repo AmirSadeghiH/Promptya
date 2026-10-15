@@ -170,10 +170,6 @@
   --danger-text: #fca5a5;
   --verified-check: #ffffff;
 
-  --tt-track: linear-gradient(135deg, #23234a, #101024);
-  --tt-star: rgba(255, 255, 255, 0.8);
-  --tt-thumb-bg: linear-gradient(135deg, #4d4784, #2b2657);
-
   color-scheme: dark;
 }
 
@@ -229,10 +225,6 @@
   --danger-soft-border: rgba(220, 38, 38, 0.35);
   --danger-text: #b91c1c;
   --verified-check: #ffffff;
-
-  --tt-track: linear-gradient(135deg, #cde2ff, #ffe7c2);
-  --tt-star: transparent;
-  --tt-thumb-bg: linear-gradient(135deg, #ffd76e, #ffab2e);
 
   color-scheme: light;
 }
@@ -3729,134 +3721,126 @@ html[dir="rtl"] .pl-knob {
 /* ==========================================================================
    23  Theme switch
    --------------------------------------------------------------------------
-   The knob's travel is a *state* of html[data-theme], not a hover effect. Both
-   the offset and the press-scale are custom properties, so they compose instead
-   of overwriting each other, and the single travel rule flips sign for RTL
-   rather than being duplicated.
+   A quiet pill that matches .lang-btn: the site's own surface, border and
+   accent tokens, with no second palette. A single accent-coloured knob slides
+   to show the active theme and carries a moon (dark) or sun (light) glyph.
+   Markup: web/partials/theme_toggle.html. Behaviour: static/js/theme.js.
    ========================================================================== */
 
 .theme-toggle {
+  --tt-w: 56px;
   --tt-h: 30px;
-  --tt-w: calc(var(--tt-h) * 2.15);
   --tt-pad: 3px;
-  --tt-knob: calc(var(--tt-h) - var(--tt-pad) * 2);
-  --tt-travel: calc(var(--tt-w) - var(--tt-knob) - var(--tt-pad) * 2);
+  --tt-knob: 24px;
+  --tt-travel: 26px;
+
   position: relative;
-  display: block;
+  display: inline-flex;
   flex-shrink: 0;
+  align-items: center;
+
   width: var(--tt-w);
   height: var(--tt-h);
   padding: 0;
+
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-pill);
-  background: var(--tt-track);
-  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.35);
-  transition: border-color var(--dur-3) var(--ease), box-shadow var(--dur-3) var(--ease);
+  background: var(--bg-elevated);
+
+  cursor: pointer;
+  appearance: none;
+  -webkit-tap-highlight-color: transparent;
+
+  transition:
+    border-color 200ms ease,
+    background-color 200ms ease;
 }
+
 .theme-toggle:hover {
   border-color: var(--accent);
 }
 
-/* Decorative sky, parked on whichever half the knob has vacated. */
-.theme-toggle-stars {
-  position: absolute;
-  inset-block-start: 10px;
-  inset-inline-end: 10px;
-  width: 3px;
-  height: 3px;
-  border-radius: 50%;
-  background: var(--tt-star);
-  box-shadow: -7px 5px 0 -1px var(--tt-star), -13px -1px 0 -1px var(--tt-star),
-    -4px -5px 0 -1px var(--tt-star);
-  transition: opacity var(--dur-4) var(--ease), transform var(--dur-4) var(--ease);
-}
-.theme-toggle-cloud {
-  position: absolute;
-  inset-block-start: 10px;
-  inset-inline-start: 11px;
-  width: 13px;
-  height: 13px;
-  border-radius: var(--radius-pill);
-  background: #ffffff;
-  opacity: 0;
-  transform: translateY(4px) scale(0.5);
-  transition: opacity var(--dur-4) var(--ease), transform var(--dur-4) var(--ease);
-}
-.theme-toggle-cloud::after {
-  content: "";
-  position: absolute;
-  inset-block-start: -4px;
-  inset-inline-start: 3px;
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: inherit;
+.theme-toggle:active {
+  transform: scale(0.96);
 }
 
+.theme-toggle:focus-visible {
+  outline: var(--ring) solid var(--accent);
+  outline-offset: var(--ring-offset);
+}
+
+/* The sliding knob. Its position is the only thing that changes with theme. */
 .theme-toggle-thumb {
-  --tt-x: 0;
-  --tt-s: 1;
   position: absolute;
   inset-block-start: var(--tt-pad);
   inset-inline-start: var(--tt-pad);
+
+  display: grid;
+  place-items: center;
+
   width: var(--tt-knob);
   height: var(--tt-knob);
   border-radius: 50%;
-  background: var(--tt-thumb-bg);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
-  transform: translateX(var(--tt-x)) scale(var(--tt-s));
-  transition: transform var(--dur-4) var(--ease), background var(--dur-3) var(--ease);
-}
-/* Light mode parks the knob at the end of the track. */
-:root[data-theme="light"] .theme-toggle-thumb {
-  --tt-x: var(--tt-travel);
-}
-:root[dir="rtl"][data-theme="light"] .theme-toggle-thumb {
-  --tt-x: calc(-1 * var(--tt-travel));
-}
-.theme-toggle:hover .theme-toggle-thumb {
-  --tt-s: 1.07;
-}
-.theme-toggle:active .theme-toggle-thumb {
-  --tt-s: 0.92;
+
+  background: var(--accent);
+  color: var(--accent-contrast);
+
+  transform: translate3d(0, 0, 0);
+  transition: transform 260ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-.theme-toggle-thumb::before,
-.theme-toggle-thumb::after {
-  content: "";
-  position: absolute;
-  inset: 20%;
-  border-radius: 50%;
-  transition: opacity var(--dur-3) var(--ease), transform var(--dur-4) var(--ease);
+.theme-toggle-icon {
+  grid-area: 1 / 1;
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: opacity 180ms ease, transform 260ms ease;
 }
-.theme-toggle-thumb::before {
-  background: transparent;
-  box-shadow: inset 4px -2px 0 1px #fdf6d8;
-  opacity: 1;
-}
-.theme-toggle-thumb::after {
-  background: radial-gradient(circle at 32% 30%, #fff9c9 0%, #ffd76e 42%, #ffab2e 100%);
+
+/* Dark is the default: the moon is shown, the sun is hidden. */
+.theme-toggle-icon-sun {
   opacity: 0;
-  transform: scale(0.4) rotate(-60deg);
+  transform: rotate(-45deg) scale(0.7);
 }
-:root[data-theme="light"] .theme-toggle {
-  box-shadow: inset 0 2px 6px rgba(22, 22, 46, 0.12);
+
+/* Light: the knob slides to the other end and the sun replaces the moon. */
+:root[data-theme="light"] .theme-toggle-thumb {
+  transform: translate3d(var(--tt-travel), 0, 0);
 }
-:root[data-theme="light"] .theme-toggle-stars {
+
+:root[dir="rtl"][data-theme="light"] .theme-toggle-thumb {
+  transform: translate3d(calc(-1 * var(--tt-travel)), 0, 0);
+}
+
+:root[data-theme="light"] .theme-toggle-icon-moon {
   opacity: 0;
-  transform: scale(0.3) rotate(90deg);
+  transform: rotate(45deg) scale(0.7);
 }
-:root[data-theme="light"] .theme-toggle-cloud {
+
+:root[data-theme="light"] .theme-toggle-icon-sun {
   opacity: 1;
-  transform: translateY(0) scale(1);
+  transform: rotate(0deg) scale(1);
 }
-:root[data-theme="light"] .theme-toggle-thumb::before {
-  opacity: 0;
-  transform: scale(0.4) rotate(60deg);
+
+/* Smaller on phones, where the topbar is tight. */
+@media (max-width: 720px) {
+  .theme-toggle {
+    --tt-h: 26px;
+    --tt-knob: 20px;
+    --tt-travel: 24px;
+  }
 }
-:root[data-theme="light"] .theme-toggle-thumb::after {
-  opacity: 1;
-  transform: scale(1) rotate(0);
+
+@media (prefers-reduced-motion: reduce) {
+  .theme-toggle,
+  .theme-toggle-thumb,
+  .theme-toggle-icon {
+    transition-duration: 0.01ms !important;
+  }
 }
 
 .lang-btn {
@@ -4232,9 +4216,6 @@ html[dir="rtl"] select {
   .topbar .btn-create {
     padding: 0 0.75rem;
   }
-  .theme-toggle {
-    --tt-h: 26px;
-  }
   /* iOS Safari force-zooms the viewport when a focused field renders under
      16px, which leaves the whole page scrolled sideways. These extra selectors
      are needed because `.search input` and friends set their own size at
@@ -4384,3 +4365,5 @@ html[dir="rtl"] select {
     display: none;
   }
 }
+
+

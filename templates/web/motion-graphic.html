@@ -1,0 +1,452 @@
+{% load static %}
+<!doctype html>
+<html lang="en" dir="ltr" data-theme="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Promptya Motion Hero</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Vazirmatn:wght@400;600;700&display=swap" />
+<style>
+/* ===== Design tokens ===== */
+:root{
+  --font:"Inter","Vazirmatn",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+  --mono:"JetBrains Mono","SF Mono",ui-monospace,Menlo,Consolas,monospace;
+  --fs-2xs:.6875rem;--fs-xs:.75rem;--fs-sm:.8125rem;--fs-base:.875rem;--fs-md:.9375rem;
+  --fs-lg:1.0625rem;--fs-xl:1.3125rem;--fs-2xl:1.625rem;
+  --sp-1:.25rem;--sp-2:.5rem;--sp-3:.75rem;--sp-4:1rem;--sp-5:1.25rem;--sp-6:1.5rem;--sp-7:2rem;--sp-8:2.5rem;
+  --radius-xs:6px;--radius-sm:8px;--radius-md:12px;--radius-lg:16px;--radius-xl:22px;--radius-pill:999px;
+  --ease:cubic-bezier(.22,1,.36,1);--dur-1:.12s;--dur-2:.18s;--dur-3:.26s;
+  --bg:#0a0a0f;--bg-elevated:#121219;--bg-card:#13131b;--bg-hover:#1c1c26;
+  --border:rgba(255,255,255,.08);--border-strong:rgba(255,255,255,.15);
+  --text:#f3f3f7;--text-secondary:#9d9daa;--text-muted:#8b8b99;
+  --accent:#7c5cff;--accent-hover:#8f74ff;--accent-soft:rgba(124,92,255,.16);
+  --accent-text:#a893ff;--accent-contrast:#fff;
+  --brand-gradient:linear-gradient(135deg,#a855f7 0%,#3b82f6 55%,#22d3ee 100%);
+  --shadow-2:0 8px 30px rgba(0,0,0,.45);--shadow-3:0 18px 48px rgba(0,0,0,.55);
+  --shadow-accent:0 4px 24px rgba(124,92,255,.28);
+  --subtle-fill:rgba(255,255,255,.03);--code-text:#d9d9e3;
+  --prompt-glow:rgba(124,92,255,.12);
+  --media-overlay:rgba(10,10,15,.74);--media-badge-text:#fff;
+  color-scheme:dark;
+}
+:root[data-theme=light]{
+  --bg:#f6f6f9;--bg-elevated:#fff;--bg-card:#fff;--bg-hover:#ececf3;
+  --border:rgba(18,18,32,.09);--border-strong:rgba(18,18,32,.17);
+  --text:#17171f;--text-secondary:#56566a;--text-muted:#63636f;
+  --accent:#5b3df5;--accent-hover:#4a2fe0;--accent-soft:rgba(91,61,245,.1);
+  --accent-text:#4a2fe0;
+  --shadow-2:0 8px 30px rgba(22,22,46,.12);--shadow-3:0 18px 48px rgba(22,22,46,.16);
+  --shadow-accent:0 4px 24px rgba(91,61,245,.22);
+  --subtle-fill:rgba(18,18,32,.04);--code-text:#2c2c3e;
+  --prompt-glow:rgba(91,61,245,.09);
+  --media-overlay:rgba(255,255,255,.88);--media-badge-text:#22222e;
+  color-scheme:light;
+}
+
+/* ===== Base ===== */
+*,*:before,*:after{box-sizing:border-box}
+body{
+  margin:0;font-family:var(--font);font-size:var(--fs-base);line-height:1.55;
+  background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased;
+}
+html[lang=fa]{line-height:1.85}
+a{color:inherit;text-decoration:none}
+button{font-family:inherit;cursor:pointer;color:inherit}
+img,svg{max-width:100%}
+img{display:block}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;border:0}
+:where(a,button):focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* ===== Page wrapper (اختیاری - می‌تونی حذفش کنی) ===== */
+.mh-wrap{max-width:1200px;margin:0 auto;padding:24px}
+
+/* ===== Motion Hero ===== */
+.mh{
+  --mh-t:11s;--dir:1;--k:1;--sy0:0px;
+  --mh-stage:#0b0a12;
+  --mh-dot:rgba(255,255,255,.055);
+  --mh-glow:rgba(124,92,255,.26);
+  --mh-glow-2:rgba(34,211,238,.09);
+  --mh-card:var(--bg-card);
+  --mh-ink:var(--text);
+  --mh-wire:rgba(168,147,255,.55);
+  --mh-spark:#ffffff;
+  --cx:-212px;--cy:0px;--cs:.84;
+  --ix:35px;--iy:0px;
+  --vx:248px;--vy:-46px;
+  --ax:248px;--ay:72px;
+  position:relative;height:400px;margin:0 0 var(--sp-6);
+  border:1px solid var(--border);border-radius:var(--radius-xl);
+  background:var(--mh-stage);overflow:hidden;isolation:isolate;
+  container-type:inline-size;contain:layout paint style;color:var(--mh-ink);
+}
+:root[dir=rtl] .mh{--dir:-1}
+:root[data-theme=light] .mh{
+  --mh-stage:#fcfcfe;--mh-dot:rgba(23,23,31,.07);
+  --mh-glow:rgba(91,61,245,.15);--mh-glow-2:rgba(59,130,246,.08);
+  --mh-wire:rgba(91,61,245,.45);--mh-spark:#5b3df5;
+}
+
+.mh-bar{position:absolute;z-index:3;inset:16px 18px auto;display:flex;align-items:center;justify-content:space-between;gap:var(--sp-3)}
+.mh-caption{margin:0;font-size:var(--fs-sm);font-weight:600;letter-spacing:.01em;color:var(--text-secondary);white-space:nowrap}
+.mh-actions{display:flex;align-items:center;gap:var(--sp-2)}
+.mh-studio{display:inline-flex;align-items:center;gap:.35rem;min-height:32px;padding:0 .8rem;border:1px solid var(--border-strong);border-radius:var(--radius-pill);font-size:var(--fs-sm);font-weight:600;color:var(--text);background:var(--subtle-fill);transition:border-color var(--dur-2) var(--ease),background var(--dur-2) var(--ease)}
+.mh-studio:hover{border-color:var(--accent);background:var(--accent-soft)}
+.mh-arrow{width:15px;height:15px;transition:transform var(--dur-3) var(--ease)}
+.mh-studio:hover .mh-arrow{transform:translate(calc(3px * var(--dir)))}
+:root[dir=rtl] .mh-arrow{transform:scaleX(-1)}
+:root[dir=rtl] .mh-studio:hover .mh-arrow{transform:scaleX(-1) translate(3px)}
+.mh-toggle{display:grid;place-items:center;width:32px;height:32px;padding:0;border:1px solid var(--border-strong);border-radius:50%;background:var(--subtle-fill);color:var(--text-secondary);transition:color var(--dur-2) var(--ease),border-color var(--dur-2) var(--ease)}
+.mh-toggle:hover{color:var(--text);border-color:var(--text-muted)}
+.mh-toggle svg{width:13px;height:13px}
+.mh-ico-play,.mh-lbl-play{display:none}
+.mh.is-paused .mh-ico-play,.mh.is-paused .mh-lbl-play{display:block}
+.mh.is-paused .mh-ico-pause,.mh.is-paused .mh-lbl-pause{display:none}
+
+.mh-stage{position:absolute;inset:0}
+.mh-defs{position:absolute;width:0;height:0;overflow:hidden}
+.mh-bg{position:absolute;inset:0;background:radial-gradient(circle at center,var(--mh-dot) 1px,transparent 1.4px) 0 0 / 22px 22px;-webkit-mask-image:radial-gradient(70% 75% at 50% 52%,#000 20%,transparent 80%);mask-image:radial-gradient(70% 75% at 50% 52%,#000 20%,transparent 80%)}
+.mh-aura{position:absolute;inset:0;margin:auto;width:640px;height:640px;border-radius:50%;background:radial-gradient(closest-side,var(--mh-glow),transparent 72%),radial-gradient(40% 40% at 70% 30%,var(--mh-glow-2),transparent 80%);opacity:.8;pointer-events:none}
+.mh-scene{position:absolute;inset:0;transform:translateY(var(--sy0)) scale(var(--k))}
+.mh-scene>*{position:absolute;inset:0;margin:auto}
+
+.mh-spark{width:8px;height:8px;border-radius:50%;background:var(--mh-spark);box-shadow:0 0 12px 3px #a893ffb3,0 0 36px 10px #7c5cff59;opacity:0}
+.mh-trail{width:200px;height:1px;opacity:0;background:linear-gradient(90deg,transparent,rgba(168,147,255,.9))}
+.mh-trail--a{transform-origin:100% 50%;translate:-100px 0}
+.mh-trail--b{transform-origin:0 50%;translate:100px 0;background:linear-gradient(270deg,transparent,rgba(168,147,255,.9))}
+.mh-dust{width:3px;height:3px;border-radius:50%;background:var(--accent-text);opacity:0}
+
+.mh-card{z-index:2;box-sizing:border-box;width:356px;height:176px;padding:16px 18px;display:flex;flex-direction:column;gap:12px;border:1px solid var(--border-strong);border-radius:var(--radius-lg);background:var(--mh-card);box-shadow:var(--shadow-3),0 0 0 1px #7c5cff0f,0 0 48px var(--prompt-glow);transform:translate(calc(var(--cx) * var(--dir)),var(--cy)) scale(var(--cs))}
+.mh-card:before{content:"";position:absolute;inset:-1px 24px auto;height:1px;background:var(--brand-gradient);opacity:.85}
+.mh-card-head{display:flex;align-items:center;gap:8px}
+.mh-avatar{width:24px;height:24px;border-radius:50%;background:var(--brand-gradient);box-shadow:inset 0 0 0 2px var(--mh-card)}
+.mh-handle{font-size:var(--fs-sm);font-weight:600;color:var(--text)}
+.mh-chip{margin-inline-start:auto;padding:2px 9px;border-radius:var(--radius-pill);background:var(--accent-soft);color:var(--accent-text);font-size:var(--fs-xs);font-weight:600}
+.mh-prompt{display:flex;flex-direction:column;gap:4px;font-family:var(--mono);font-size:14px;line-height:1.6;color:var(--code-text)}
+html[lang=fa] .mh-prompt{font-family:var(--font);font-size:15px;line-height:1.75}
+.mh-line{position:relative;display:block;width:fit-content;max-width:100%;overflow:hidden;white-space:nowrap;text-overflow:clip;unicode-bidi:plaintext}
+.mh-line:last-child{color:var(--text-secondary)}
+.mh-cover{position:absolute;inset:0 -4px 0 0;background:var(--mh-card);transform:translate(calc(var(--dir) * 102%))}
+:root[dir=rtl] .mh-cover{inset:0 0 0 -4px}
+.mh-cover:before{content:"";position:absolute;inset-block:3px;inset-inline-start:0;width:2px;border-radius:1px;background:var(--accent);opacity:0}
+.mh-card-foot{margin-top:auto;display:flex;justify-content:flex-end}
+.mh-go{position:relative;display:inline-flex;align-items:center;gap:6px;min-height:32px;padding:0 12px;border-radius:var(--radius-pill);background:var(--accent);color:var(--accent-contrast);font-size:var(--fs-sm);font-weight:600;box-shadow:var(--shadow-accent)}
+.mh-go svg{width:14px;height:14px}
+.mh-cost{padding-inline-start:7px;border-inline-start:1px solid rgba(255,255,255,.3);font-family:var(--mono);font-size:var(--fs-xs);opacity:.9}
+.mh-go:after{content:"";position:absolute;inset:-2px;border-radius:inherit;box-shadow:0 0 0 2px var(--accent);opacity:0}
+
+.mh-wires{width:600px;height:200px;overflow:visible;transform:scaleX(var(--dir));fill:none;stroke:var(--mh-wire);stroke-width:1;stroke-dasharray:64;stroke-dashoffset:64;opacity:0}
+.mh-node{z-index:3;display:grid;place-items:center;width:28px;height:28px;border-radius:50%;border:1px solid var(--border-strong);background:var(--mh-card);color:var(--accent-text);box-shadow:0 0 0 4px #7c5cff14;opacity:0;transform:translate(calc(236px * var(--dir)),var(--ny))}
+.mh-node svg{width:14px;height:14px}
+
+.mh-out{z-index:1;overflow:hidden;border:1px solid var(--border-strong);border-radius:var(--radius-md);background:#120d2b;box-shadow:var(--shadow-2);transform:translate(calc(var(--ox) * var(--dir)),var(--oy))}
+.mh-out--image{--ox:var(--ix);--oy:var(--iy);width:140px;height:200px}
+.mh-out--video{--ox:var(--vx);--oy:var(--vy);width:230px;height:128px}
+.mh-out--audio{--ox:var(--ax);--oy:var(--ay);width:230px;height:76px;display:flex;align-items:center;gap:10px;padding:0 14px;box-sizing:border-box;background:var(--mh-card)}
+.mh-art{position:absolute;inset:0;width:100%;height:100%;display:block}
+.mh-whale{position:absolute;width:62%;inset-inline-start:18%;top:30%;height:auto}
+.mh-out--video .mh-whale{width:38%;top:24%;inset-inline-start:22%}
+:root[dir=rtl] .mh-whale{scale:-1 1}
+.mh-veil{position:absolute;inset:0;background:radial-gradient(60% 50% at 40% 40%,rgba(168,147,255,.9),transparent 70%),linear-gradient(160deg,#2a1d63,#120d2b 60%,#3b2a7a);opacity:0}
+.mh-scan{height:2px;inset:0 0 auto;position:absolute;background:linear-gradient(90deg,transparent,#e9e4ff 30%,#9fe8ff 70%,transparent);box-shadow:0 0 10px 2px #a893ff99;opacity:0}
+.mh-badge{position:absolute;top:8px;inset-inline-start:8px;padding:2px 8px;border-radius:var(--radius-pill);background:var(--media-overlay);color:var(--media-badge-text);font-size:var(--fs-xs);font-weight:600;line-height:1.5}
+.mh-play{position:absolute;inset:0;margin:auto;width:34px;height:34px;border-radius:50%;display:grid;place-items:center;background:#0a0a0f73;border:1px solid rgba(255,255,255,.35);color:#fff}
+.mh-play svg,.mh-aplay svg{width:14px;height:14px}
+.mh-track{position:absolute;inset:auto 10px 10px;height:3px;border-radius:2px;background:#ffffff40;overflow:hidden}
+.mh-progress{position:absolute;inset:0;background:#fff;transform-origin:0 50%;transform:scaleX(.45)}
+:root[dir=rtl] .mh-progress{transform-origin:100% 50%}
+.mh-time{position:absolute;inset:auto auto 18px 10px;font-family:var(--mono);font-size:var(--fs-xs);color:#ffffffd9}
+.mh-aplay{flex:none;width:34px;height:34px;border-radius:50%;display:grid;place-items:center;background:var(--accent);color:var(--accent-contrast)}
+.mh-wave{flex:1;height:40px;display:flex;align-items:center;justify-content:space-between;min-width:0}
+.mh-wave i{width:3px;height:calc(var(--h) * 4px + 4px);border-radius:2px;background:var(--brand-gradient);background-size:1px 40px;transform:scaleY(.7)}
+.mh-atime{font-family:var(--mono);font-size:var(--fs-xs);color:var(--text-secondary)}
+
+.mh-ring{width:180px;height:180px;border-radius:50%;border:1px solid rgba(168,147,255,.7);opacity:0}
+.mh-brand{z-index:4;width:max-content;height:max-content;display:flex;flex-direction:column;align-items:center;gap:10px;opacity:0;pointer-events:none}
+.mh-mark{width:64px;height:64px;border-radius:16px;box-shadow:0 10px 40px #7c5cff59}
+.mh-word{display:block;overflow:hidden;padding-bottom:2px}
+.mh-word>span{display:block;font-size:34px;line-height:1.15;font-weight:700;letter-spacing:-.035em;color:var(--text)}
+.mh-tagline{font-size:var(--fs-md);color:var(--text-secondary)}
+
+/* ===== Animation wiring ===== */
+.mh-aura,.mh-spark,.mh-trail,.mh-dust,.mh-card,.mh-cover,.mh-cover:before,.mh-go,.mh-go:after,.mh-wires,.mh-node,.mh-out,.mh-veil,.mh-scan,.mh-whale,.mh-progress,.mh-wave i,.mh-ring,.mh-brand,.mh-mark,.mh-word>span,.mh-tagline{animation-duration:var(--mh-t);animation-iteration-count:infinite;animation-timing-function:var(--ease);animation-fill-mode:both}
+
+.mh-aura{animation-name:mh-aura}
+.mh-spark{animation-name:mh-spark}
+.mh-trail{animation-name:mh-trail}
+.mh-dust{animation-name:mh-dust;animation-delay:var(--d)}
+.mh-card{animation-name:mh-card}
+.mh-cover--1{animation-name:mh-type-1}
+.mh-cover--2{animation-name:mh-type-2}
+.mh-cover--1:before{animation-name:mh-caret-1}
+.mh-cover--2:before{animation-name:mh-caret-2}
+.mh-go{animation-name:mh-press}
+.mh-go:after{animation-name:mh-ripple}
+.mh-wires{animation-name:mh-wires}
+.mh-node{animation-name:mh-node;animation-delay:var(--d)}
+.mh-out{animation-name:mh-out}
+.mh-out--video{animation-delay:70ms}
+.mh-out--audio{animation-delay:.14s}
+.mh-veil{animation-name:mh-veil}
+.mh-scan{animation-name:mh-scan}
+.mh-whale{animation-name:mh-drift;animation-timing-function:ease-in-out}
+.mh-progress{animation-name:mh-progress;animation-timing-function:linear}
+.mh-wave i{animation-name:mh-bar;animation-delay:calc(var(--i) * 22ms)}
+.mh-ring{animation-name:mh-ring}
+.mh-brand{animation-name:mh-brand}
+.mh-mark{animation-name:mh-mark}
+.mh-word>span{animation-name:mh-word}
+.mh-tagline{animation-name:mh-tag}
+
+@keyframes mh-aura{0%{opacity:0;transform:scale(.55)}9%{opacity:.75;transform:scale(.75)}22%{opacity:.6;transform:scale(.95)}42%{opacity:.95;transform:scale(1.08)}64%{opacity:.65;transform:scale(1)}76%{opacity:1;transform:scale(.7)}90%{opacity:.75;transform:scale(.85)}99%,to{opacity:0;transform:scale(.55)}}
+@keyframes mh-spark{0%,2%{opacity:0;transform:translateY(0) scale(0)}7%{opacity:1;transform:translateY(0) scale(1)}10.5%{opacity:1;transform:translateY(0) scale(1.5)}15%{opacity:1;transform:translateY(-88px) scale(30,.25)}18%{opacity:0;transform:translateY(-88px) scale(40,.15)}to{opacity:0;transform:translateY(0) scale(0)}}
+@keyframes mh-trail{0%,2.5%{opacity:0;transform:scaleX(0)}7.5%{opacity:.9;transform:scaleX(1)}12%{opacity:0;transform:scaleX(.2)}to{opacity:0;transform:scaleX(0)}}
+@keyframes mh-dust{0%,1%{opacity:0;transform:translate(calc(var(--dx) * var(--dir)),var(--dy))}4%{opacity:.9}10%{opacity:0;transform:translate(0)}to{opacity:0;transform:translate(0)}}
+@keyframes mh-card{0%,12.5%{opacity:0;transform:translateY(16px) scale(.965)}18%{opacity:1;transform:translate(0) scale(1)}40%{opacity:1;transform:translate(0) scale(1)}49%,67%{opacity:1;transform:translate(calc(var(--cx) * var(--dir)),var(--cy)) scale(var(--cs))}75%{opacity:0;transform:translate(0) scale(.4)}to{opacity:0;transform:translateY(16px) scale(.965)}}
+@keyframes mh-type-1{0%,18.5%{transform:translate(0);animation-timing-function:cubic-bezier(.45,.05,.55,.95)}27%,to{transform:translate(calc(var(--dir) * 102%))}}
+@keyframes mh-type-2{0%,27.5%{transform:translate(0);animation-timing-function:cubic-bezier(.45,.05,.55,.95)}33.5%,to{transform:translate(calc(var(--dir) * 102%))}}
+@keyframes mh-caret-1{0%,17.5%{opacity:0}18.5%,27%{opacity:1}27.5%,to{opacity:0}}
+@keyframes mh-caret-2{0%,27%{opacity:0}27.5%,35%{opacity:1}36.5%,to{opacity:0}}
+@keyframes mh-wires{0%,33%{opacity:0;stroke-dashoffset:64}34%{opacity:1}38%{opacity:1;stroke-dashoffset:0}42%{opacity:1;stroke-dashoffset:0}45%,to{opacity:0;stroke-dashoffset:0}}
+@keyframes mh-node{0%,34.5%{opacity:0;transform:translate(calc(236px * var(--dir)),var(--ny)) scale(.4)}37.5%{opacity:1;transform:translate(calc(236px * var(--dir)),var(--ny)) scale(1)}41%{opacity:1;transform:translate(calc(236px * var(--dir)),var(--ny)) scale(1)}44.5%{opacity:0;transform:translate(calc(250px * var(--dir)),var(--ny)) scale(1.5)}to{opacity:0;transform:translate(calc(236px * var(--dir)),var(--ny)) scale(.4)}}
+@keyframes mh-press{0%,37%{transform:scale(1)}38.5%{transform:scale(.93)}40.5%{transform:scale(1.03)}42%,to{transform:scale(1)}}
+@keyframes mh-ripple{0%,38.5%{opacity:0;transform:scale(1)}39.5%{opacity:.9;transform:scale(1)}45%{opacity:0;transform:scale(1.35,1.7)}to{opacity:0;transform:scale(1)}}
+@keyframes mh-out{0%,40.5%{opacity:0;transform:translate(0) scale(.3)}43%{opacity:1}49.5%,67%{opacity:1;transform:translate(calc(var(--ox) * var(--dir)),var(--oy)) scale(1)}75.5%{opacity:0;transform:translate(0) scale(.3)}to{opacity:0;transform:translate(0) scale(.3)}}
+@keyframes mh-veil{0%,44%{opacity:1}53%,to{opacity:0}}
+@keyframes mh-scan{0%,43%{opacity:0;transform:translateY(0)}44%{opacity:1;transform:translateY(0)}52.5%{opacity:1;transform:translateY(var(--scan,200px))}54%,to{opacity:0;transform:translateY(var(--scan,200px))}}
+.mh-out--video{--scan:128px}
+@keyframes mh-drift{0%,44%{transform:translate(calc(-6px * var(--dir)),3px)}70%{transform:translate(calc(10px * var(--dir)),-3px)}to{transform:translate(calc(-6px * var(--dir)),3px)}}
+@keyframes mh-progress{0%,49%{transform:scaleX(.02)}68%{transform:scaleX(.9)}to{transform:scaleX(.02)}}
+@keyframes mh-bar{0%,45%{transform:scaleY(.12)}50%{transform:scaleY(1)}53.5%{transform:scaleY(.5)}57%{transform:scaleY(.95)}60.5%{transform:scaleY(.4)}64%{transform:scaleY(.85)}70%{transform:scaleY(.12)}to{transform:scaleY(.12)}}
+@keyframes mh-ring{0%,71%{opacity:0;transform:scale(.2)}73.5%{opacity:.8}83%{opacity:0;transform:scale(2)}to{opacity:0;transform:scale(.2)}}
+@keyframes mh-brand{0%,71.5%{opacity:0}73%,93.5%{opacity:1}98.5%,to{opacity:0}}
+@keyframes mh-mark{0%,71.5%{transform:scale(.55) rotate(-8deg)}79%,to{transform:scale(1) rotate(0)}}
+@keyframes mh-word{0%,75%{transform:translateY(105%)}81.5%,to{transform:translateY(0)}}
+@keyframes mh-tag{0%,79%{opacity:0;transform:translateY(6px)}85%,to{opacity:1;transform:translateY(0)}}
+
+/* ===== Pause / offscreen / still ===== */
+.mh.is-paused *,.mh.is-paused *:before,.mh.is-paused *:after,
+.mh.is-offscreen *,.mh.is-offscreen *:before,.mh.is-offscreen *:after{animation-play-state:paused!important}
+.mh.is-still *,.mh.is-still *:before,.mh.is-still *:after{animation:none!important}
+.mh.is-still .mh-toggle{display:none}
+
+/* ===== Responsive (container queries) ===== */
+@container (max-width:840px){.mh-scene{--k:.88}}
+@container (max-width:720px){.mh-scene{--k:.76}}
+@container (max-width:620px){.mh-scene{--k:.68}.mh-studio span{display:none}.mh-studio{padding:0 .55rem}}
+@container (max-width:560px){
+  .mh-scene{--k:1;--sy0:18px;--cx:0px;--cy:-74px;--cs:.84;--ix:-108px;--iy:76px;--vx:0px;--vy:76px;--ax:108px;--ay:76px}
+  .mh-dust,.mh-trail,.mh-wires,.mh-node,.mh-studio{display:none}
+  .mh-card{width:316px}
+  .mh-prompt{font-size:13px}
+  .mh-out--image,.mh-out--video,.mh-out--audio{width:96px;height:96px}
+  .mh-out--video,.mh-out--image{--scan:96px}
+  .mh-out--video .mh-whale,.mh-whale{width:70%;inset-inline-start:14%;top:34%}
+  .mh-out--video .mh-time{display:none}
+  .mh-play{width:28px;height:28px}
+  .mh-out--audio{flex-direction:column;justify-content:center;gap:8px;padding:10px}
+  .mh-aplay{width:28px;height:28px}
+  .mh-wave{flex:none;width:100%;height:28px}
+  .mh-wave i{width:2px;height:calc(var(--h) * 2.6px + 3px)}
+  .mh-atime,.mh-badge{display:none}
+  .mh-word>span{font-size:30px}
+}
+@media(max-width:640px){.mh{height:380px;border-radius:var(--radius-lg);margin-bottom:var(--sp-5)}}
+@media(max-width:400px){.mh-caption{font-size:var(--fs-xs)}}
+@media(prefers-reduced-motion:reduce){
+  .mh *,.mh *:before,.mh *:after{animation:none!important}
+  .mh-toggle{display:none}
+}
+</style>
+</head>
+<body>
+
+<div class="mh-wrap">
+  <section class="mh" data-motion-hero aria-labelledby="mh-caption">
+    <div class="mh-bar">
+      <p class="mh-caption" id="mh-caption" >One prompt. Infinite possibilities.</p>
+      <div class="mh-actions">
+        <a class="mh-studio" href="{%url 'web:studio' %}">
+          <span>Open AI Studio</span>
+          <svg class="mh-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </a>
+        <button type="button" class="mh-toggle" data-mh-toggle aria-pressed="false">
+          <svg class="mh-ico-pause" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="7" y="5" width="3.5" height="14" rx="1"/><rect x="13.5" y="5" width="3.5" height="14" rx="1"/></svg>
+          <svg class="mh-ico-play" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.2-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg>
+          <span class="sr-only mh-lbl-pause" data-i18n="mh_pause">Pause animation</span>
+          <span class="sr-only mh-lbl-play" data-i18n="mh_play">Play animation</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="mh-stage" role="img" aria-labelledby="mh-desc">
+      <span class="sr-only" id="mh-desc" data-i18n="mh_aria">Animation: one prompt becomes an image, a video and a soundtrack, then the Promptya logo.</span>
+      <div class="mh-bg" aria-hidden="true"></div>
+      <div class="mh-aura" aria-hidden="true"></div>
+
+      <div class="mh-scene" aria-hidden="true">
+        <!-- A · The spark -->
+        <span class="mh-trail mh-trail--a"></span>
+        <span class="mh-trail mh-trail--b"></span>
+        <span class="mh-dust" style="--dx:-260px;--dy:-90px;--d:0ms"></span>
+        <span class="mh-dust" style="--dx:-170px;--dy:110px;--d:90ms"></span>
+        <span class="mh-dust" style="--dx:230px;--dy:-115px;--d:40ms"></span>
+        <span class="mh-dust" style="--dx:300px;--dy:70px;--d:140ms"></span>
+        <span class="mh-dust" style="--dx:-40px;--dy:-150px;--d:180ms"></span>
+        <span class="mh-dust" style="--dx:90px;--dy:140px;--d:60ms"></span>
+        <span class="mh-spark"></span>
+
+        <!-- C · Outputs -->
+        <div class="mh-out mh-out--image">
+          <svg class="mh-art" viewBox="0 0 240 200" preserveAspectRatio="xMidYMid slice"><use href="#mh-dawn"/></svg>
+          <svg class="mh-whale" viewBox="0 0 100 42"><use href="#mh-whale-shape"/></svg>
+          <span class="mh-veil"></span><span class="mh-scan"></span>
+          <span class="mh-badge" data-i18n="image">Image</span>
+        </div>
+        <div class="mh-out mh-out--video">
+          <svg class="mh-art" viewBox="0 0 240 200" preserveAspectRatio="xMidYMid slice"><use href="#mh-dawn"/></svg>
+          <svg class="mh-whale" viewBox="0 0 100 42"><use href="#mh-whale-shape"/></svg>
+          <span class="mh-veil"></span><span class="mh-scan"></span>
+          <span class="mh-badge" data-i18n="video">Video</span>
+          <span class="mh-play"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.2-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg></span>
+          <span class="mh-track"><span class="mh-progress"></span></span>
+          <span class="mh-time" dir="ltr">00:04</span>
+        </div>
+        <div class="mh-out mh-out--audio">
+          <span class="mh-aplay"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.2-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg></span>
+          <span class="mh-wave"><i style="--h:5;--i:0"></i><i style="--h:7;--i:1"></i><i style="--h:6;--i:2"></i><i style="--h:8;--i:3"></i><i style="--h:9;--i:4"></i><i style="--h:4;--i:5"></i><i style="--h:7;--i:6"></i><i style="--h:5;--i:7"></i><i style="--h:8;--i:8"></i><i style="--h:6;--i:9"></i><i style="--h:9;--i:10"></i><i style="--h:5;--i:11"></i><i style="--h:9;--i:12"></i><i style="--h:4;--i:13"></i><i style="--h:7;--i:14"></i><i style="--h:6;--i:15"></i><i style="--h:8;--i:16"></i><i style="--h:5;--i:17"></i><i style="--h:7;--i:18"></i><i style="--h:9;--i:19"></i><i style="--h:6;--i:20"></i><i style="--h:8;--i:21"></i><i style="--h:5;--i:22"></i><i style="--h:7;--i:23"></i><i style="--h:4;--i:24"></i><i style="--h:9;--i:25"></i><i style="--h:6;--i:26"></i><i style="--h:8;--i:27"></i></span>
+          <span class="mh-atime" dir="ltr">0:12</span>
+        </div>
+
+        <!-- B · The prompt -->
+        <svg class="mh-wires" viewBox="-300 -100 600 200">
+          <path d="M180,-22 C200,-22 204,-54 222,-54"/>
+          <path d="M180,0 L222,0"/>
+          <path d="M180,22 C200,22 204,54 222,54"/>
+        </svg>
+        <span class="mh-node" style="--ny:-54px;--d:0ms"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="2"/><path d="M21 15l-5-5L5 21"/></svg></span>
+        <span class="mh-node" style="--ny:0px;--d:110ms"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="15" height="14" rx="3"/><path d="M17 10l5-3v10l-5-3"/></svg></span>
+        <span class="mh-node" style="--ny:54px;--d:220ms"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></span>
+
+        <div class="mh-card">
+          <div class="mh-card-head">
+            <span class="mh-avatar"></span>
+            <span class="mh-handle" dir="ltr">@nova</span>
+            <span class="mh-chip" data-i18n="prompt_type">Prompt</span>
+          </div>
+          <div class="mh-prompt">
+            <span class="mh-line"><span>A glass whale over a sleeping city</span><i class="mh-cover mh-cover--1"></i></span>
+            <span class="mh-line"><span>dawn light, soft haze, 35mm</span><i class="mh-cover mh-cover--2"></i></span>
+          </div>
+          <div class="mh-card-foot">
+            <span class="mh-go">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.9 5.6L19.5 9.5l-5.6 1.9L12 17l-1.9-5.6L4.5 9.5l5.6-1.9z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></svg>
+              <span>Generate</span>
+              <span class="mh-cost" dir="ltr">80</span>
+            </span>
+          </div>
+        </div>
+
+        <!-- D · Identity -->
+        <span class="mh-ring"></span>
+        <div class="mh-brand">
+          <img class="mh-mark" src="{% static 'icons/source/mark-192.png'%}" width="64" height="64" alt="" decoding="async" loading="lazy">
+          <span class="mh-word"><span>Promptya</span></span>
+          <span class="mh-tagline" >Create beyond imagination.</span>
+        </div>
+      </div>
+
+      <svg class="mh-defs" width="0" height="0" aria-hidden="true" focusable="false">
+        <defs>
+          <linearGradient id="mh-sky" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#120d2b"/><stop offset=".42" stop-color="#36216b"/>
+            <stop offset=".68" stop-color="#94508f"/><stop offset=".85" stop-color="#ef8e78"/>
+            <stop offset="1" stop-color="#f7c8a2"/>
+          </linearGradient>
+          <radialGradient id="mh-sun" cx=".5" cy=".5" r=".5">
+            <stop offset="0" stop-color="#ffe3c4"/><stop offset=".55" stop-color="#ffb994" stop-opacity=".9"/>
+            <stop offset="1" stop-color="#ff9a85" stop-opacity="0"/>
+          </radialGradient>
+          <linearGradient id="mh-fog" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#f7c8a2" stop-opacity="0"/><stop offset=".6" stop-color="#f3b9a0" stop-opacity=".45"/>
+            <stop offset="1" stop-color="#f7c8a2" stop-opacity="0"/>
+          </linearGradient>
+          <linearGradient id="mh-glass" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="#ffffff" stop-opacity=".62"/><stop offset=".5" stop-color="#c9d8ff" stop-opacity=".22"/>
+            <stop offset="1" stop-color="#9fe8ff" stop-opacity=".38"/>
+          </linearGradient>
+          <symbol id="mh-dawn" viewBox="0 0 240 200">
+            <rect width="240" height="200" fill="url(#mh-sky)"/>
+            <circle cx="160" cy="134" r="40" fill="url(#mh-sun)"/>
+            <circle cx="62" cy="34" r=".9" fill="#fff" opacity=".7"/><circle cx="118" cy="22" r=".7" fill="#fff" opacity=".55"/>
+            <circle cx="200" cy="48" r=".8" fill="#fff" opacity=".5"/><circle cx="30" cy="70" r=".6" fill="#fff" opacity=".4"/>
+            <path d="M0,200L0,160L0,130L10,130L10,118L22,118L22,124L28,124L28,118L38,118L38,136L52,136L52,124L58,124L58,152L70,152L70,136L76,136L76,152L82,152L82,124L88,124L88,118L96,118L96,152L110,152L110,136L116,136L116,130L122,130L122,152L132,152L132,124L140,124L140,142L154,142L154,130L168,130L168,136L174,136L174,124L184,124L184,124L198,124L198,118L212,118L212,136L226,136L226,152L238,152L238,156L248,156L240,200Z" fill="#0f0a22"/>
+            <rect y="112" width="240" height="56" fill="url(#mh-fog)"/>
+          </symbol>
+          <symbol id="mh-whale-shape" viewBox="0 0 100 42">
+            <path d="M2,23 C9,11 32,6 55,9 C69,11 79,16 86,21 C90,15 95,10 99,8 C97,15 96,21 97,27 C93,25 89,24 86,25 C78,33 60,37 40,35 C22,33 8,29 2,23 Z" fill="url(#mh-glass)" stroke="#fff" stroke-opacity=".75" stroke-width=".8"/>
+            <path d="M40,31 C44,38 50,41 55,40 C51,37 49,34 48,31 Z" fill="#fff" fill-opacity=".28"/>
+            <path d="M10,17 C26,10 48,9 66,13" fill="none" stroke="#fff" stroke-opacity=".6" stroke-width=".7" stroke-linecap="round"/>
+            <circle cx="12" cy="21" r="1.1" fill="#fff"/>
+          </symbol>
+        </defs>
+      </svg>
+    </div>
+  </section>
+</div>
+
+<script>
+(function () {
+  /* ---------- ترجمه فارسی (خودکار بر اساس lang روی <html>) ---------- */
+  var FA = {
+    mh_caption: "یک پرامپت. بی‌نهایت امکان.",
+    mh_open_studio: "ورود به استودیو",
+    mh_pause: "توقف انیمیشن",
+    mh_play: "پخش انیمیشن",
+    mh_aria: "انیمیشن: یک پرامپت به تصویر، ویدیو و موسیقی تبدیل می‌شود و سپس به لوگوی پرامپتیا.",
+    image: "تصویر",
+    video: "ویدیو",
+    prompt_type: "پرامپت",
+    mh_prompt_1: "نهنگ شیشه‌ای بر فراز شهری خفته",
+    mh_prompt_2: "نور سحر، مه ملایم، ۳۵ میلی‌متری",
+    mh_generate: "بساز",
+    mh_tagline: "فراتر از خیال بساز."
+  };
+  if (document.documentElement.lang === "fa") {
+    document.querySelectorAll("[data-i18n]").forEach(function (el) {
+      var k = el.getAttribute("data-i18n");
+      if (FA[k]) el.textContent = FA[k];
+    });
+  }
+
+  /* ---------- انیمیشن: توقف/پخش + توقف در حالت غیرقابل‌مشاهده ---------- */
+  document.querySelectorAll("[data-motion-hero]").forEach(function (hero) {
+    var toggle = hero.querySelector("[data-mh-toggle]");
+
+    if (toggle) {
+      toggle.addEventListener("click", function () {
+        var paused = hero.classList.toggle("is-paused");
+        toggle.setAttribute("aria-pressed", String(paused));
+      });
+    }
+
+    /* احترام به prefers-reduced-motion */
+    var mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    var applyStill = function () { hero.classList.toggle("is-still", mq.matches); };
+    applyStill();
+    if (mq.addEventListener) mq.addEventListener("change", applyStill);
+    else if (mq.addListener) mq.addListener(applyStill);
+
+    /* وقتی از دید خارج شد، انیمیشن متوقف شود (صرفه‌جویی در CPU) */
+    if ("IntersectionObserver" in window) {
+      new IntersectionObserver(function (entries) {
+        hero.classList.toggle("is-offscreen", !entries[0].isIntersecting);
+      }).observe(hero);
+    }
+  });
+})();
+</script>
+</body>
+</html>

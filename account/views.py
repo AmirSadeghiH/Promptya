@@ -5,16 +5,18 @@ import secrets
 from django.conf import settings
 from django.contrib.auth import authenticate, get_user_model, login, logout
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.hashers import check_password, make_password
 from django.core.exceptions import ValidationError
 from django.core.mail import send_mail
-from django.db.models import Count, Q
+from django.db.models import Count, F, Q
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
 from django.utils import timezone
-from django.views.decorators.csrf import csrf_exempt
-from django.views.decorators.http import require_POST
+from django.views.decorators.cache import never_cache
+from django.views.decorators.http import require_GET, require_POST
 
+from account.models import EmailVerificationToken
 from core.ratelimit import rate_limit_ip
 from interactions.models import Follow, Save
 from posts.services import post_list_queryset, serialize_post
@@ -98,7 +100,6 @@ def serialize_user(user, *, viewer=None, detailed=False):
 
 
 @rate_limit_ip("signup", limit=5, window_seconds=3600, error_message="Too many signup attempts from this IP. Try again in an hour.")
-@csrf_exempt
 @require_POST
 def signup(request):
     data = _parse_body(request)
@@ -141,15 +142,15 @@ def signup(request):
             user.referred_by = referrer
             user.save(update_fields=["referred_by"])
 
-    # Create and send verification token
-    token = _create_verification_token(user)
-    _send_verification_email(request, user, token)
+    # Issue and email the verification code
+    code = issue_verification_code(user)
+    send_verification_code_email(request, user, code)
 
     # Don't log in - user must verify email first
     return JsonResponse(
         {
             "success": True,
-            "message": "Account created. Please check your email to verify your address.",
+            "message": "Account created. We sent a 6-digit verification code to your email. Enter it to verify your address.",
             "email_sent": True,
         },
         status=201,
@@ -157,7 +158,6 @@ def signup(request):
 
 
 @rate_limit_ip("login", limit=10, window_seconds=300, error_message="Too many login attempts. Try again in 5 minutes.")
-@csrf_exempt
 @require_POST
 def api_login(request):
     data = _parse_body(request)
@@ -344,53 +344,88 @@ def saved_posts(request):
 
 
 # ---------------------------------------------------------------------------
-# Email Verification
+# Email verification (code/OTP)
 # ---------------------------------------------------------------------------
+#
+# A 6-digit code is emailed at signup, valid for exactly
+# EMAIL_VERIFICATION_CODE_TTL_SECONDS, and entered on the standalone
+# /verify-email/ page. Only the code's salted hash is stored. These
+# functions are the single implementation shared by the JSON API and the
+# web views (web/auth_views.py).
+
+# A throwaway hash so every failed check runs exactly one check_password:
+# response timing must not reveal whether an email, code, or attempt state
+# exists.
+_DUMMY_CODE_HASH = make_password("000000")
+
+_GENERIC_CODE_FAILURE = "The code is incorrect or has expired. Request a new code if needed."
 
 
-def _create_verification_token(user):
-    """Create or replace a verification token for the user."""
-    from account.models import EmailVerificationToken
+def _normalize_code(raw):
+    """Digits only — everything else in the field is dropped."""
+    return "".join(ch for ch in (raw or "") if ch in "0123456789")
 
-    token = secrets.token_urlsafe(32)
-    expires_at = timezone.now() + timezone.timedelta(seconds=120) #2 minutes
 
+def generate_verification_code():
+    """A uniform 6-digit code from the CSPRNG (leading zeros kept)."""
+    length = settings.EMAIL_VERIFICATION_CODE_LENGTH
+    return f"{secrets.randbelow(10 ** length):0{length}d}"
+
+
+def issue_verification_code(user):
+    """Issue (or replace) the user's verification code; return it in clear.
+
+    Supersedes any existing row: the previous code stops working immediately,
+    so a "slow mail lands after a resend" situation cannot verify with the old
+    code.
+    """
+    code = generate_verification_code()
     EmailVerificationToken.objects.update_or_create(
         user=user,
         defaults={
-            "token": token,
-            "expires_at": expires_at,
+            "code_hash": make_password(code),
+            "attempts": 0,
+            "expires_at": timezone.now()
+            + timezone.timedelta(seconds=settings.EMAIL_VERIFICATION_CODE_TTL_SECONDS),
             "used_at": None,
         },
     )
-    return token
+    return code
 
 
-def _send_verification_email(request, user, token):
-    """Send verification email to the user."""
-    verify_url = request.build_absolute_uri(
-        f"/api/auth/verify-email/{token}/"
-    )
+def can_resend_now(user):
+    """Whether a new code may be emailed to this (unverified) user.
 
+    While an issued, unexpired, unused code exists, resending is a
+    server-side no-op — the "resend after expiry" rule holds even for a
+    client without JS, and there is at most one live code.
+    """
+    try:
+        token = user.verification_token
+    except EmailVerificationToken.DoesNotExist:
+        return True
+    if not token.code_hash or token.used_at is not None:
+        return True
+    return timezone.now() >= token.expires_at
+
+
+def send_verification_code_email(request, user, code):
+    """Email the code to the user.
+
+    The link goes to the bare /verify-email/ page — the code itself is never
+    put in a URL, so it cannot leak through the Referer header or history.
+    """
+    verify_url = request.build_absolute_uri("/verify-email/")
+    context = {
+        "user": user,
+        "code": code,
+        "verify_url": verify_url,
+        "site_name": getattr(settings, "SITE_URL", "").rstrip("/")
+        or request.get_host(),
+    }
     subject = render_to_string("account/verification_email_subject.txt").strip()
-    html_message = render_to_string(
-        "account/verification_email.html",
-        {
-            "user": user,
-            "verify_url": verify_url,
-            "site_name": getattr(settings, "SITE_URL", "").rstrip("/")
-            or request.get_host(),
-        },
-    )
-    plain_message = render_to_string(
-        "account/verification_email.txt",
-        {
-            "user": user,
-            "verify_url": verify_url,
-            "site_name": getattr(settings, "SITE_URL", "").rstrip("/")
-            or request.get_host(),
-        },
-    )
+    html_message = render_to_string("account/verification_email.html", context)
+    plain_message = render_to_string("account/verification_email.txt", context)
 
     send_mail(
         subject,
@@ -402,77 +437,120 @@ def _send_verification_email(request, user, token):
     )
 
 
-@rate_limit_ip("resend_verification", limit=3, window_seconds=3600, error_message="Too many verification emails sent. Try again in an hour.")
-@csrf_exempt
-@require_POST
-def resend_verification(request):
-    """Resend verification email to the user."""
-    data = _parse_body(request)
-    if data is None:
-        return JsonResponse({"error": "Invalid JSON body."}, status=400)
+def verify_user_code(user, code):
+    """Check ``code`` against the user's issued code; True only on success.
 
-    email = str(data.get("email", "")).strip().lower()
-    if not email:
-        return JsonResponse({"error": "Email is required."}, status=400)
-
-    User = get_user_model()
-    user = User.objects.filter(email__iexact=email).first()
-
-    # Always return success to prevent email enumeration
-    if user is None or user.is_verified:
-        return JsonResponse({"success": True, "message": "If the email exists and is unverified, a verification link has been sent."})
-
-    token = _create_verification_token(user)
-    _send_verification_email(request, user, token)
-
-    return JsonResponse({"success": True, "message": "If the email exists and is unverified, a verification link has been sent."})
-
-
-def verify_email(request, token):
-    """Verify email using token from email link."""
-    from account.models import EmailVerificationToken
+    Exactly one check_password runs on every path (the dummy hash when there
+    is no live code), so timing reveals nothing. A wrong 6-digit entry
+    increments the row's attempt counter with an F() expression, so the
+    per-code cap holds even across rotating IPs. Malformed input (not 6
+    digits) consumes no attempt.
+    """
+    normalized = _normalize_code(code)
+    if (
+        user is None
+        or user.is_verified
+        or len(normalized) != settings.EMAIL_VERIFICATION_CODE_LENGTH
+    ):
+        check_password("000000", _DUMMY_CODE_HASH)
+        return False
 
     try:
-        verification = EmailVerificationToken.objects.select_related("user").get(token=token)
+        token = user.verification_token
     except EmailVerificationToken.DoesNotExist:
-        return render(request, "account/verification_failed.html", {"error": "invalid_token"})
+        token = None
 
-    if not verification.is_valid():
-        if verification.used_at:
-            return render(request, "account/verification_failed.html", {"error": "already_used"})
-        return render(request, "account/verification_failed.html", {"error": "expired"})
+    if (
+        token is None
+        or not token.code_hash
+        or token.used_at is not None
+        or token.attempts >= settings.EMAIL_VERIFICATION_CODE_MAX_ATTEMPTS
+        or timezone.now() >= token.expires_at
+    ):
+        check_password("000000", _DUMMY_CODE_HASH)
+        return False
 
-    user = verification.user
-    if user.is_verified:
-        verification.mark_used()
-        return render(request, "account/verification_failed.html", {"error": "already_verified"})
+    if check_password(normalized, token.code_hash):
+        user.is_verified = True
+        user.save(update_fields=["is_verified"])
+        token.mark_used()
+        return True
 
-    # Mark user as verified and token as used
-    user.is_verified = True
-    user.save(update_fields=["is_verified"])
-    verification.mark_used()
-
-    return render(request, "account/verification_success.html", {"user": user})
+    EmailVerificationToken.objects.filter(pk=token.pk).update(
+        attempts=F("attempts") + 1
+    )
+    return False
 
 
-@rate_limit_ip("resend_verification_page", limit=3, window_seconds=3600, error_message="Too many requests. Try again in an hour.")
-def resend_verification_page(request):
-    """Page to resend verification email."""
-    if request.method == "POST":
-        email = request.POST.get("email", "").strip().lower()
-        if not email:
-            return render(request, "account/resend_verification.html", {"error": "Email is required."})
+@rate_limit_ip("verify_email_code", limit=10, window_seconds=300, error_message="Too many verification attempts. Try again in a few minutes.")
+@require_POST
+def verify_email_code(request):
+    """Verify the email address with the emailed 6-digit code. JSON {email, code}.
 
-        User = get_user_model()
-        user = User.objects.filter(email__iexact=email).first()
+    Every failure mode returns the same 400 body, so the response cannot be
+    used to tell an unknown email apart from a wrong, expired, or used code.
+    """
+    data = _parse_body(request)
+    email = str(data.get("email", "")).strip().lower() if data else ""
+    code = str(data.get("code", "")) if data else ""
 
-        # Always return success to prevent email enumeration
-        if user is None or user.is_verified:
-            return render(request, "account/resend_verification.html", {"success": "If the email exists and is unverified, a verification link has been sent."})
+    user = None
+    if email:
+        user = (
+            get_user_model()
+            .objects.filter(email__iexact=email)
+            .select_related("verification_token")
+            .first()
+        )
 
-        token = _create_verification_token(user)
-        _send_verification_email(request, user, token)
+    if verify_user_code(user, code):
+        return JsonResponse({"success": True, "message": "Your email has been verified."})
+    return JsonResponse(
+        {"success": False, "message": _GENERIC_CODE_FAILURE}, status=400
+    )
 
-        return render(request, "account/resend_verification.html", {"success": "If the email exists and is unverified, a verification link has been sent."})
 
-    return render(request, "account/resend_verification.html")
+@rate_limit_ip("resend_verification", limit=3, window_seconds=3600, error_message="Too many verification codes requested. Try again in an hour.")
+@require_POST
+def resend_verification(request):
+    """Resend a verification code. JSON {email}.
+
+    Always returns the same generic success, so it cannot be used to tell a
+    known email from an unknown one. A code is actually sent only when the
+    email exists, is unverified, and the previous code has expired or never
+    existed.
+    """
+    data = _parse_body(request)
+    email = str(data.get("email", "")).strip().lower() if data else ""
+
+    user = None
+    if email:
+        user = (
+            get_user_model()
+            .objects.filter(email__iexact=email)
+            .select_related("verification_token")
+            .first()
+        )
+
+    if user is not None and not user.is_verified and can_resend_now(user):
+        code = issue_verification_code(user)
+        send_verification_code_email(request, user, code)
+
+    return JsonResponse(
+        {
+            "success": True,
+            "message": "If the email exists and is unverified, a new verification code is on its way.",
+        }
+    )
+
+
+@never_cache
+@require_GET
+def verification_link_retired(request, token):
+    """Retired link flow: a standalone notice. Never verifies anything.
+
+    Link emails sent before the switch to codes land here (not on a 404) and
+    are pointed at /verify-email/. The token segment is deliberately ignored —
+    no lookup, no user row touched.
+    """
+    return render(request, "account/verification_link_retired.html")

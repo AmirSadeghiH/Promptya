@@ -160,11 +160,9 @@ def log_admin_action(
 
     ip = None
     if request:
-        xff = request.META.get("HTTP_X_FORWARDED_FOR")
-        if xff:
-            ip = xff.split(",")[0].strip()
-        else:
-            ip = request.META.get("REMOTE_ADDR")
+        from core.ratelimit import get_client_ip
+
+        ip = get_client_ip(request)
 
     AuditLog.objects.create(
         actor=request.user if request and request.user.is_authenticated else None,

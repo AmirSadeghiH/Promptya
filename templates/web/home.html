@@ -6,6 +6,7 @@
 {% if crumbs %}{% seo_breadcrumbs crumbs %}{% endif %}
 
 <h1 class="page-title">{{ seo_h1 }}</h1>
+{% include "web/motion-graphic.html" %}
 
 <div class="feed-tabs">
   <a class="tab {% if feed_tab == 'foryou' %}active{% endif %}" href="{% url 'web:home' %}" data-i18n="for_you">{{ i18n.for_you }}</a>

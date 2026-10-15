@@ -1,0 +1,16 @@
+{% extends "web/auth_base_new.html" %}
+{% load i18n %}
+{% block title %}{% trans "Email verified!" %} · Promptya{% endblock %}
+
+{% block auth_content %}
+  <div class="auth-success-icon" aria-hidden="true">
+    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>
+  </div>
+
+  <header class="auth-card-head">
+    <h1 id="auth-title" class="auth-title" data-i18n="email_verified">{% trans "Email verified!" %}</h1>
+    <p class="auth-subtitle" data-i18n="verification_success_tagline">{% trans "Your email has been verified. You can now log in to your account." %}</p>
+  </header>
+
+  <a class="btn btn-primary btn-lg auth-block" href="{% url 'login' %}" data-i18n="login">{% trans "Log in" %}</a>
+{% endblock %}

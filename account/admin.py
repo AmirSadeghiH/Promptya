@@ -9,10 +9,10 @@ from credits.services import adjust
 
 @admin.register(EmailVerificationToken)
 class EmailVerificationTokenAdmin(admin.ModelAdmin):
-    list_display = ("user", "created_at", "expires_at", "used_at", "is_valid")
+    list_display = ("user", "attempts", "created_at", "expires_at", "used_at", "is_valid")
     list_filter = ("created_at", "expires_at", "used_at")
-    search_fields = ("user__username", "user__email", "token")
-    readonly_fields = ("user", "token", "created_at", "expires_at", "used_at")
+    search_fields = ("user__username", "user__email")
+    readonly_fields = ("user", "code_hash", "attempts", "created_at", "expires_at", "used_at")
     date_hierarchy = "created_at"
 
     def is_valid(self, obj):

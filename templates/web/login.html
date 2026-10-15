@@ -1,22 +1,26 @@
-{% extends "web/base.html" %}
+{% extends "web/auth_base.html" %}
+{% load i18n %}
 {% block title %}{{ i18n.login }} · Promptya{% endblock %}
-{% block robots %}<meta name="robots" content="noindex, follow">{% endblock %}
 
-{% block content %}
-<div class="auth-card">
-  <h1 data-i18n="welcome_back">{{ i18n.welcome_back }}</h1>
-  <p class="muted" data-i18n="login_tagline">{{ i18n.login_tagline }}</p>
-  {% if error %}<div class="form-error">{{ error }}</div>{% endif %}
-  <form method="post" class="auth-form">
+{% block auth_content %}
+  <h1 id="auth-title" class="auth-title" data-i18n="welcome_back">{{ i18n.welcome_back }}</h1>
+  <p class="auth-lede muted" data-i18n="login_tagline">{{ i18n.login_tagline }}</p>
+
+  {% if error %}<div class="auth-alert" role="alert">{{ error }}</div>{% endif %}
+
+  <form method="post" class="auth-form" novalidate>
     {% csrf_token %}
-    <label class="field"><span data-i18n="username_or_email">{{ i18n.username_or_email }}</span>
-      <input type="text" name="username" required autocomplete="username">
-    </label>
-    <label class="field"><span data-i18n="password">{{ i18n.password }}</span>
-      <input type="password" name="password" required autocomplete="current-password">
-    </label>
-    <button class="btn btn-primary btn-lg" type="submit" data-i18n="login">{{ i18n.login }}</button>
+    <div class="field">
+      <label for="login-username" data-i18n="username_or_email">{{ i18n.username_or_email }}</label>
+      <input id="login-username" type="text" name="username" required autocomplete="username" autocapitalize="none" spellcheck="false" inputmode="email">
+    </div>
+    <div class="field">
+      <label for="login-password" data-i18n="password">{{ i18n.password }}</label>
+      <input id="login-password" type="password" name="password" required autocomplete="current-password">
+    </div>
+    <button class="btn btn-primary btn-block btn-lg" type="submit" data-i18n="login">{{ i18n.login }}</button>
   </form>
-  <p class="muted"><span data-i18n="no_account">{{ i18n.no_account }}</span> <a href="{% url 'signup' %}" data-i18n="signup">{{ i18n.signup }}</a></p>
-</div>
+
+  <p class="auth-switch"><span data-i18n="no_account">{{ i18n.no_account }}</span> <a href="{% url 'signup' %}" data-i18n="signup">{{ i18n.signup }}</a></p>
+  <p class="auth-switch"><a href="{% url 'account:password_reset' %}" data-i18n="forgot_password">{{ i18n.forgot_password }}</a></p>
 {% endblock %}

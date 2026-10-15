@@ -1,0 +1,17 @@
+{% extends "web/auth_base_new.html" %}
+{% load i18n %}
+{% block title %}{% trans "This verification link is no longer valid" %} · Promptya{% endblock %}
+
+{% block auth_content %}
+  <header class="auth-card-head">
+    <h1 id="auth-title" class="auth-title" data-i18n="verify_link_retired_title">{% trans "This verification link is no longer valid" %}</h1>
+  </header>
+
+  <p class="auth-note" data-i18n="verify_link_retired_body">{% trans "Promptya now verifies email with a short code instead of a link. Open the verification page and enter the code from your latest email, or request a new one." %}</p>
+
+  <a class="btn btn-primary btn-lg auth-block" href="{% url 'verify-email' %}" data-i18n="verify_code_title">{% trans "Verify your email" %}</a>
+
+  <p class="auth-switch">
+    <a class="auth-link" href="{% url 'login' %}" data-i18n="back_to_login">{% trans "Back to login" %}</a>
+  </p>
+{% endblock %}

@@ -1,0 +1,34 @@
+{% extends "web/base.html" %}
+{% load static %}
+{% comment %}
+  Standalone shell for login, signup and the verification notice. It extends the
+  site base so the head, SEO, theme and language handling stay in one place, and
+  sets `standalone` so the app chrome (topbar, drawer, sidebar, footer, bottom
+  nav) is not rendered. The auth page is a focused, single-task screen.
+{% endcomment %}
+
+{% block robots %}<meta name="robots" content="noindex, nofollow">{% endblock %}
+
+{% block content %}
+<div class="auth-page">
+  <div class="auth-utility">
+    {% include "web/partials/theme_toggle.html" with id="auth-theme-toggle" %}
+    <button class="lang-btn js-lang-toggle" type="button" data-lang-href="{{ lang_switch_url }}" aria-label="{{ i18n.switch_language }}">
+      <span>{{ i18n.lang_switch_label }}</span>
+    </button>
+  </div>
+
+  <main class="auth-shell" id="auth-main">
+    <a class="auth-brand" href="{% url 'web:home' %}" aria-label="Promptya">
+      <img class="logo-mark" src="{% static 'icons/icon-192.png' %}" alt="" width="40" height="40" decoding="async">
+      <span class="logo-text">Promptya</span>
+    </a>
+
+    <section class="auth-panel" aria-labelledby="auth-title">
+      {% block auth_content %}{% endblock %}
+    </section>
+
+    <p class="auth-fineprint muted" data-i18n="footer_rights">{{ i18n.footer_rights }}</p>
+  </main>
+</div>
+{% endblock %}

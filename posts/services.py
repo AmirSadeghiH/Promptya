@@ -35,7 +35,8 @@ def post_list_queryset(viewer=None):
     ``serialize_post`` does not run two extra queries per post (N+1).
     """
     queryset = (
-        Post.objects.select_related("author", "category")
+        Post.objects.visible()
+        .select_related("author", "category")
         .prefetch_related("tags")
         .annotate(
             like_count=Count("likes", distinct=True),

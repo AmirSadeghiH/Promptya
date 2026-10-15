@@ -9,7 +9,7 @@ from imagegen.models import AIConfig, GeneratedImage
 class AIConfigAdmin(admin.ModelAdmin):
     """The provider settings screen — the only place a key is entered."""
 
-    list_display = ("model", "base_url", "credit_cost", "is_enabled", "has_api_key", "updated_at")
+    list_display = ("model", "base_url", "credit_cost", "premium_credit_cost", "is_enabled", "has_api_key", "updated_at")
     readonly_fields = ("updated_at",)
     fieldsets = (
         (
@@ -25,8 +25,19 @@ class AIConfigAdmin(admin.ModelAdmin):
         (
             "Generation",
             {
-                "fields": ("image_size", "timeout_seconds", "credit_cost", "is_enabled"),
-                "description": "credits charged per image; raise it for a pricier model.",
+                "fields": ("image_size", "timeout_seconds", "credit_cost", "premium_credit_cost", "prompt_use_reward", "is_enabled"),
+                "description": (
+                    "Credits charged per image; raise it for a pricier model. "
+                    "Prompt-use reward: credits paid to a prompt's author each time "
+                    "someone generates from it (0 = off; capped at the generation price)."
+                ),
+            },
+        ),
+        (
+            "Watermark",
+            {
+                "fields": ("watermark_text", "watermark_opacity", "watermark_size_ratio"),
+                "description": "Server-side watermark applied to standard (non-premium) generations.",
             },
         ),
         ("Timestamps", {"fields": ("updated_at",)}),
@@ -57,6 +68,7 @@ class AIConfigAdmin(admin.ModelAdmin):
                 "model": obj.model,
                 "base_url": obj.base_url,
                 "credit_cost": obj.credit_cost,
+                "premium_credit_cost": obj.premium_credit_cost,
                 "is_enabled": obj.is_enabled,
                 "has_api_key": bool(obj.api_key),
             })
@@ -64,8 +76,8 @@ class AIConfigAdmin(admin.ModelAdmin):
 
 @admin.register(GeneratedImage)
 class GeneratedImageAdmin(admin.ModelAdmin):
-    list_display = ("id", "user", "status", "provider_model", "credit_cost", "created_at", "image_preview")
-    list_filter = ("status", "provider_model", "created_at")
+    list_display = ("id", "user", "status", "tier", "provider_model", "credit_cost", "creator_reward", "created_at", "image_preview")
+    list_filter = ("status", "tier", "provider_model", "created_at")
     search_fields = ("prompt", "user__username", "error", "idempotency_key")
     autocomplete_fields = ("user", "source_post")
     date_hierarchy = "created_at"

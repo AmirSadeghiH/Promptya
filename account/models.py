@@ -5,8 +5,15 @@ from django.utils import timezone
 
 
 def _default_verification_expiry():
-    """Default expiry: 24 hours from now."""
+    """Kept because migration 0004 references it when it rebuilds history."""
     return timezone.now() + timezone.timedelta(hours=24)
+
+
+def _default_code_expiry():
+    """Default expiry: EMAIL_VERIFICATION_CODE_TTL_SECONDS from now."""
+    return timezone.now() + timezone.timedelta(
+        seconds=settings.EMAIL_VERIFICATION_CODE_TTL_SECONDS
+    )
 
 
 class CustomUser(AbstractUser):
@@ -95,11 +102,13 @@ class CustomUser(AbstractUser):
 
 
 class EmailVerificationToken(models.Model):
-    """One-time email verification token.
+    """Row holding a user's emailed verification code.
 
-    Tokens are generated at signup and sent via email. They expire after
-    24 hours and can only be used once. A user can have at most one valid
-    token at a time (new tokens invalidate old ones).
+    The code is a short numeric value, sent by email at signup, valid for
+    exactly EMAIL_VERIFICATION_CODE_TTL_SECONDS and usable once. Only its
+    salted hash (django.contrib.auth.hashers) is stored — the code itself
+    never appears in the database, URLs, or logs. A user has at most one row;
+    issuing a new code supersedes and invalidates the previous one.
     """
 
     user = models.OneToOneField(
@@ -108,30 +117,40 @@ class EmailVerificationToken(models.Model):
         related_name="verification_token",
     )
 
-    token = models.CharField(
-        max_length=64,
-        unique=True,
-        db_index=True,
-    )
+    # make_password() output (pbkdf2_sha256, salt embedded in the string).
+    # Empty until the first code is issued; a row with an empty hash is inert.
+    code_hash = models.CharField(max_length=128, default="")
+
+    # Wrong 6-digit entries against the currently issued code. Reset to 0 on
+    # every re-issue; at EMAIL_VERIFICATION_CODE_MAX_ATTEMPTS the code dies.
+    attempts = models.PositiveIntegerField(default=0)
 
     created_at = models.DateTimeField(auto_now_add=True)
 
-    expires_at = models.DateTimeField(default=_default_verification_expiry)
+    expires_at = models.DateTimeField(default=_default_code_expiry)
 
     used_at = models.DateTimeField(blank=True, null=True)
 
     class Meta:
-        verbose_name = "Email verification token"
-        verbose_name_plural = "Email verification tokens"
+        verbose_name = "Email verification code"
+        verbose_name_plural = "Email verification codes"
 
     def __str__(self):
-        return f"Verification token for {self.user}"
+        return f"Verification code for {self.user}"
+
+    @property
+    def is_expired(self):
+        return timezone.now() >= self.expires_at
 
     def is_valid(self):
-        """Check if token is still valid (not expired, not used)."""
-        return self.used_at is None and timezone.now() < self.expires_at
+        """Issued, not used, not attempt-locked, and not expired."""
+        if not self.code_hash or self.used_at is not None:
+            return False
+        if self.attempts >= settings.EMAIL_VERIFICATION_CODE_MAX_ATTEMPTS:
+            return False
+        return not self.is_expired
 
     def mark_used(self):
-        """Mark token as used."""
+        """Mark the code as used."""
         self.used_at = timezone.now()
         self.save(update_fields=["used_at"])

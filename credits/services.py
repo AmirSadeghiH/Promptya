@@ -100,12 +100,13 @@ def refund(user, amount, *, generation=None, note="") -> CreditTransaction:
     )
 
 
-def reward(user, amount, *, challenge=None, note="") -> CreditTransaction:
+def reward(user, amount, *, challenge=None, generation=None, note="") -> CreditTransaction:
     amount = int(amount)
     if amount <= 0:
         raise ValueError("A reward must be positive.")
     return _apply(
-        user, amount, TransactionKind.REWARD, challenge=challenge, note=note
+        user, amount, TransactionKind.REWARD,
+        challenge=challenge, generation=generation, note=note,
     )
 
 

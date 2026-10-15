@@ -31,6 +31,9 @@ urlpatterns = [
     path('login/', auth_views.login_page, name='login'),
     path('signup/', auth_views.signup_page, name='signup'),
     path('logout/', auth_views.logout_view, name='logout'),
+    path('verify-email/', auth_views.verify_email_page, name='verify-email'),
+    path('verify-email/resend/', auth_views.resend_code_page, name='verify-email-resend'),
+    path('verify-email/success/', auth_views.verification_success_page, name='verify-email-success'),
 
     # --- Crawler plumbing: a single absolute address, never prefixed -------
     path('robots.txt', views.robots_txt, name='robots'),

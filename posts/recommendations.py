@@ -166,7 +166,7 @@ def get_suggested_users(*, user=None, limit=SUGGESTED_USERS_LIMIT):
     if top_categories:
         category_ids = [cid for cid, _ in top_categories]
         for row in (
-            Post.objects.filter(category_id__in=category_ids)
+            Post.objects.visible().filter(category_id__in=category_ids)
             .values("author_id")
             .annotate(n=Count("id"))
         ):

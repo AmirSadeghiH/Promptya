@@ -231,6 +231,13 @@ else:
     EMAIL_USE_TLS = _env_bool("EMAIL_USE_TLS", default=True)
     DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "Promptya <noreply@promptya.app>")
 
+# Email verification code (OTP): a short numeric code is emailed at signup and
+# entered on the standalone /verify-email/ page. It is valid for exactly
+# TTL seconds, after which a new one may be requested.
+EMAIL_VERIFICATION_CODE_LENGTH = 6
+EMAIL_VERIFICATION_CODE_TTL_SECONDS = 120
+EMAIL_VERIFICATION_CODE_MAX_ATTEMPTS = 5
+
 # Cache configuration: Redis in production, local memory in development.
 # Set REDIS_URL for production (e.g., redis://:password@host:6379/0).
 _redis_url = os.environ.get("REDIS_URL")
@@ -372,6 +379,11 @@ else:
 CSRF_TRUSTED_ORIGINS = [
     o for o in os.environ.get("DJANGO_CSRF_TRUSTED_ORIGINS", "").split(",") if o
 ]
+
+# How many reverse proxies sit in front of Django (nginx = 1). Used to find the
+# real client IP in X-Forwarded-For. Leave at 0 when Django is not behind a
+# proxy, otherwise the header is attacker-controlled. See core.ratelimit.
+TRUSTED_PROXY_COUNT = int(os.environ.get("DJANGO_TRUSTED_PROXY_COUNT", "0") or 0)
 
 if not DEBUG:
     SECURE_SSL_REDIRECT = _env_bool("DJANGO_SECURE_SSL_REDIRECT", default=True)

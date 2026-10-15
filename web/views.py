@@ -297,7 +297,7 @@ def explore_page(request):
     explore = get_explore_data(viewer=_viewer(request))
     labels = seo_labels(request)
     listing_items = [
-        _language_alternate_path("web:post-detail", post["id"]) for post in explore["trending"]
+        _language_alternate_path("web:post-detail", post["slug"]) for post in explore["trending"]
     ]
     context = {
         **_base_context(request),
@@ -367,7 +367,7 @@ def category_page(request, slug):
         description = labels["category_description_fmt"].format(name=category.name, count=count)
 
     category_path = _language_alternate_path("web:category", category.slug)
-    listing_items = [_language_alternate_path("web:post-detail", post.pk) for post in page.object_list]
+    listing_items = [_language_alternate_path("web:post-detail", post.slug) for post in page.object_list]
     context = {
         **_base_context(request),
         **_meta_context(
@@ -420,7 +420,7 @@ def tag_page(request, slug):
     count = queryset.count()
     indexable = tag.is_indexable
     tag_path = _language_alternate_path("web:tag", tag.slug)
-    listing_items = [_language_alternate_path("web:post-detail", post.pk) for post in page.object_list]
+    listing_items = [_language_alternate_path("web:post-detail", post.slug) for post in page.object_list]
     context = {
         **_base_context(request),
         **_meta_context(
@@ -732,7 +732,7 @@ def profile_page(request, username):
     else:
         description = labels["profile_description_fmt"].format(count=count, username=user.username)
 
-    listing_items = [_language_alternate_path("web:post-detail", post.pk) for post in page.object_list]
+    listing_items = [_language_alternate_path("web:post-detail", post.slug) for post in page.object_list]
     context = {
         **_base_context(request),
         **_meta_context(

@@ -140,3 +140,4 @@ GitHub.sublime-settings
 # Agent / AI work directories
 .freebuff/
 .worktrees/
+.kilo/

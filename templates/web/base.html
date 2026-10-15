@@ -127,6 +127,7 @@
 <body>
   <a class="skip-link" href="#main">{{ i18n.skip_to_content }}</a>
 
+{% if not standalone %}
   <!-- ===== Top bar ===== -->
   <header class="topbar">
     <button id="menu-btn" class="hamburger" type="button"
@@ -158,7 +159,7 @@
     <nav class="topbar-actions" aria-label="{{ i18n.primary_nav }}">
       {% include "web/partials/theme_toggle.html" with id="theme-toggle" %}
 
-      <button id="lang-btn" class="lang-btn js-lang-toggle" type="button" aria-label="{{ i18n.switch_language }}">
+      <button id="lang-btn" class="lang-btn js-lang-toggle" type="button" data-lang-href="{{ lang_switch_url }}" aria-label="{{ i18n.switch_language }}">
         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" style="width:15px;height:15px"><circle cx="12" cy="12" r="9"/><path d="M3.6 9h16.8M3.6 15h16.8M12 3a15.3 15.3 0 0 1 0 18 15.3 15.3 0 0 1 0-18z"/></svg>
         <span>{{ i18n.lang_switch_label }}</span>
       </button>
@@ -181,7 +182,9 @@
       {% endif %}
     </nav>
   </header>
+{% endif %}
 
+{% if not standalone %}
   <!-- ===== Mobile / tablet navigation drawer ===== -->
   <div id="nav-scrim" class="nav-scrim" hidden></div>
   <aside id="nav-drawer" class="nav-drawer" aria-label="{{ i18n.primary_nav }}" aria-hidden="true">
@@ -265,15 +268,17 @@
 
       <div class="drawer-prefs">
         {% include "web/partials/theme_toggle.html" with id="theme-toggle-drawer" %}
-        <button class="lang-btn js-lang-toggle" type="button" aria-label="{{ i18n.switch_language }}">
-          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" style="width:15px;height:15px"><circle cx="12" cy="12" r="9"/><path d="M3.6 9h16.8M3.6 15h16.8M12 3a15.3 15.3 0 0 1 0 18 15.3 15.3 0 0 1 0-18z"/></svg>
+        <button class="lang-btn js-lang-toggle" type="button" data-lang-href="{{ lang_switch_url }}" aria-label="{{ i18n.switch_language }}">
+<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" style="width:15px;height:15px"><circle cx="12" cy="12" r="9"/><path d="M3.6 9h16.8M3.6 15h16.8M12 3a15.3 15.3 0 0 1 0 18 15.3 15.3 0 0 1 0-18z"/></svg>
           <span>{{ i18n.lang_switch_label }}</span>
         </button>
       </div>
     </div>
   </aside>
+{% endif %}
 
   <div class="shell">
+{% if not standalone %}
     <!-- ===== Sidebar (desktop) ===== -->
     <aside class="sidebar">
       <nav class="sidenav" aria-label="{{ i18n.primary_nav }}">
@@ -312,6 +317,7 @@
         <span data-i18n="sidebar_tagline">{{ i18n.sidebar_tagline }}</span>
       </footer>
     </aside>
+{% endif %}
 
     <!-- ===== Main ===== -->
     <main class="main" id="main" tabindex="-1">
@@ -322,6 +328,7 @@
     </main>
   </div>
 
+{% if not standalone %}
   <!-- ===== Site footer ===== -->
   <footer class="site-footer">
     <div class="footer-inner">
@@ -333,7 +340,7 @@
         <p class="footer-tagline" data-i18n="footer_tagline">{{ i18n.footer_tagline }}</p>
         <div class="footer-prefs">
           {% include "web/partials/theme_toggle.html" with id="theme-toggle-footer" %}
-          <button class="lang-btn js-lang-toggle" type="button" aria-label="{{ i18n.switch_language }}">
+          <button class="lang-btn js-lang-toggle" type="button" data-lang-href="{{ lang_switch_url }}" aria-label="{{ i18n.switch_language }}">
             <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" style="width:15px;height:15px"><circle cx="12" cy="12" r="9"/><path d="M3.6 9h16.8M3.6 15h16.8M12 3a15.3 15.3 0 0 1 0 18 15.3 15.3 0 0 1 0-18z"/></svg>
             <span>{{ i18n.lang_switch_label }}</span>
           </button>
@@ -379,7 +386,9 @@
       <span data-i18n="footer_rights">{{ i18n.footer_rights }}</span>
     </div>
   </footer>
+{% endif %}
 
+{% if not standalone %}
   <!-- ===== Bottom nav (mobile) ===== -->
   <nav class="bottom-nav" aria-label="{{ i18n.primary_nav }}">
     <a class="bottom-link {% if request.resolver_match.url_name == 'home' %}active{% endif %}" href="{% url 'web:home' %}" {% if request.resolver_match.url_name == 'home' %}aria-current="page"{% endif %}>
@@ -410,6 +419,7 @@
       {% endif %}
     </a>
   </nav>
+{% endif %}
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <script>window.PROMPTYA_LANG = "{{ lang }}";</script>

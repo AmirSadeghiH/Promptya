@@ -1,0 +1,72 @@
+{% extends "web/auth_base_new.html" %}
+{% load static i18n %}
+{% block title %}{% trans "Sign up" %} · Promptya{% endblock %}
+
+{% block auth_content %}
+  <header class="auth-card-head">
+    <h1 id="auth-title" class="auth-title" data-i18n="create_account">{% trans "Create your account" %}</h1>
+    <p class="auth-subtitle" data-i18n="signup_tagline">{% trans "Join the community of prompt creators." %}</p>
+  </header>
+
+  {% if error %}
+    <div class="auth-alert" role="alert">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+      <span>{{ error }}</span>
+    </div>
+  {% endif %}
+
+  <form method="post" class="auth-form" action="{% url 'signup' %}">
+    {% csrf_token %}
+    {% if ref %}<input type="hidden" name="ref" value="{{ ref }}">{% endif %}
+
+    <div class="field">
+      <label class="field-label" for="signup-username" data-i18n="username">{% trans "Username" %}</label>
+      <div class="field-wrapper">
+        <svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+        <input id="signup-username" class="field-input" type="text" name="username" required
+               minlength="3" maxlength="150" autocomplete="username" autocapitalize="none" spellcheck="false"
+               aria-describedby="signup-username-hint">
+      </div>
+      <span id="signup-username-hint" class="field-hint" data-i18n="username_hint">{% trans "3–150 chars: letters, numbers and _ . + - @" %}</span>
+    </div>
+
+    <div class="field">
+      <label class="field-label" for="signup-email" data-i18n="email">{% trans "Email" %}</label>
+      <div class="field-wrapper">
+        <svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+        <input id="signup-email" class="field-input" type="email" name="email" required
+               autocomplete="email" autocapitalize="none" spellcheck="false" inputmode="email"
+               aria-describedby="signup-email-hint">
+      </div>
+      <span id="signup-email-hint" class="field-hint" data-i18n="email_hint">{% trans "We'll send a 6-digit verification code to this address." %}</span>
+    </div>
+
+    <div class="field">
+      <label class="field-label" for="signup-password" data-i18n="password">{% trans "Password" %}</label>
+      <div class="field-wrapper">
+        <svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        <input id="signup-password" class="field-input has-toggle" type="password" name="password" required
+               minlength="8" autocomplete="new-password" aria-describedby="signup-password-hint">
+        <button type="button" class="field-toggle" aria-pressed="false" aria-label="{% trans 'Show password' %}">
+          <svg class="icon toggle-show" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          <svg class="icon toggle-hide" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><path d="M1 1l22 22"/></svg>
+        </button>
+      </div>
+      <div class="password-strength" data-level="0" aria-hidden="true">
+        <div class="strength-bars"><span></span><span></span><span></span><span></span></div>
+        <span class="strength-label"></span>
+      </div>
+      <span id="signup-password-hint" class="field-hint" data-i18n="password_min_hint">{% trans "At least 8 characters." %}</span>
+    </div>
+
+    <button type="submit" class="btn btn-primary btn-lg auth-submit">
+      <span class="auth-submit-label" data-i18n="create_account_btn">{% trans "Create account" %}</span>
+      <span class="auth-spinner" aria-hidden="true"></span>
+    </button>
+  </form>
+
+  <p class="auth-switch">
+    <span data-i18n="have_account">{% trans "Already have an account?" %}</span>
+    <a class="auth-link" href="{% url 'login' %}" data-i18n="login">{% trans "Log in" %}</a>
+  </p>
+{% endblock %}

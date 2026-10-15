@@ -12,6 +12,7 @@ from web.seo import (
     absolute_path,
     active_language,
     language_direction,
+    language_path,
     organization_node,
     seo_strings,
     website_node,
@@ -29,6 +30,7 @@ def ui_prefs(request):
     served.
     """
     lang = active_language(request)
+    other = next((code for code in LANGUAGES if code != lang), lang)
     return {
         "lang": lang,
         "dir": language_direction(lang),
@@ -40,7 +42,16 @@ def ui_prefs(request):
         "site_languages": LANGUAGES,
         "default_language": DEFAULT_LANGUAGE,
         "lang_cookie": LANG_COOKIE,
+        # The same page in the other language. The switch navigates here rather
+        # than reloading, because a reload keeps the old /en/ prefix and the
+        # prefix outranks the cookie.
+        "lang_switch_url": _with_query(language_path(request.path, other), request),
     }
+
+
+def _with_query(path, request):
+    query = request.META.get("QUERY_STRING", "")
+    return f"{path}?{query}" if query else path
 
 
 def seo_prefs(request):

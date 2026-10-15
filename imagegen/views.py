@@ -13,7 +13,6 @@ import json
 
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
-from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
 from core.ratelimit import rate_limit_user
@@ -21,10 +20,12 @@ from credits.services import InsufficientCredits
 from posts.models import Post
 
 from imagegen.client import GenerationError
+from imagegen.models import GeneratedImage
 from imagegen.services import (
     MAX_PROMPT_LENGTH,
     PromptRejected,
     SourceImageRejected,
+    TierError,
     credit_payload,
     generate_image,
     serialize_generation,
@@ -55,13 +56,12 @@ def _source_post(data):
         raw_id = int(raw_id.strip())
     if not isinstance(raw_id, int):
         return None
-    return Post.objects.filter(pk=raw_id).first()
+    return Post.objects.visible().filter(pk=raw_id).first()
 
 
 @login_required
 @rate_limit_user("generate", limit=10, window_seconds=60, error_message="Too many generation requests. Try again in a minute.")
 @rate_limit_user("generate_hourly", limit=50, window_seconds=3600, error_message="Hourly generation limit reached. Try again later.")
-@csrf_exempt
 @require_POST
 def api_generate(request):
     data, source_image = _read_request(request)
@@ -78,6 +78,14 @@ def api_generate(request):
             status=400,
         )
 
+    # Extract and validate tier
+    tier = (data.get("tier") or "").strip().lower() or GeneratedImage.Tier.STANDARD
+    if tier not in GeneratedImage.Tier.values:
+        return JsonResponse(
+            {"error_code": "bad_request", "error": f"Invalid tier: {tier}. Must be 'standard' or 'premium'."},
+            status=400,
+        )
+
     try:
         record = generate_image(
             request.user,
@@ -86,6 +94,7 @@ def api_generate(request):
             source_post=_source_post(data),
             source_image=source_image,
             idempotency_key=idempotency_key,
+            tier=tier,
         )
     except PromptRejected as exc:
         return JsonResponse(
@@ -118,6 +127,15 @@ def api_generate(request):
                 "credits": credit_payload(request.user),
             },
             status=402,
+        )
+    except TierError as exc:
+        return JsonResponse(
+            {
+                "error_code": "invalid_tier",
+                "error": str(exc),
+                "credits": credit_payload(request.user),
+            },
+            status=400,
         )
     except GenerationError as exc:
         return JsonResponse(
