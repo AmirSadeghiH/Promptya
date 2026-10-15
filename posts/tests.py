@@ -1,6 +1,7 @@
 from datetime import timedelta
 
 from django.contrib.auth import get_user_model
+from django.core.files.base import ContentFile
 from django.db import connection
 from django.test import TestCase
 from django.test.utils import CaptureQueriesContext
@@ -365,3 +366,181 @@ class PostCrudApiTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertFalse(Post.objects.filter(pk=self.post.pk).exists())
+
+
+class AIModelSelectTests(TestCase):
+    """Posters pick the AI model from the admin-maintained list; never a text box."""
+
+    def setUp(self):
+        self.user = get_user_model().objects.create_user(
+            username="model-picker",
+            email="model-picker@example.com",
+            password="test-password",
+        )
+        self.category = Category.objects.create(name="Models", slug="models")
+        self.create_url = reverse("web:create")
+        self.api_url = reverse("posts:post-create")
+
+    def _payload(self, **overrides):
+        payload = {
+            "post_type": "prompt",
+            "title": "Modelled prompt",
+            "prompt": "Do something amazing",
+            "ai_model": "GPT-5",
+            "category_id": self.category.id,
+        }
+        payload.update(overrides)
+        return payload
+
+    def test_the_seed_migration_makes_the_list_non_empty(self):
+        from imagegen.models import AIModel
+
+        names = AIModel.active_names()
+        self.assertIn("GPT-5", names)
+        self.assertIn("Midjourney", names)
+
+    def test_the_create_page_offers_a_select_not_a_text_box(self):
+        self.client.force_login(self.user)
+
+        response = self.client.get(self.create_url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, '<select name="ai_model">')
+        self.assertNotContains(response, 'type="text" name="ai_model"')
+        # A seeded option is rendered, and the empty option is the default.
+        self.assertContains(response, ">GPT-5</option>")
+
+    def test_a_seeded_model_is_accepted(self):
+        self.client.force_login(self.user)
+
+        response = self.client.post(self.api_url, self._payload(), content_type="application/json")
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.json()["post"]["ai_model"], "GPT-5")
+
+    def test_the_canonical_spelling_is_stored(self):
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            self.api_url,
+            self._payload(ai_model="gpt-5"),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.json()["post"]["ai_model"], "GPT-5")
+
+    def test_a_hand_typed_model_is_rejected(self):
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            self.api_url,
+            self._payload(ai_model="MyInventedModel"),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("ai_model", response.json()["errors"])
+        self.assertFalse(Post.objects.filter(title="Modelled prompt").exists())
+
+    def test_an_inactive_model_is_not_selectable(self):
+        from imagegen.models import AIModel
+
+        AIModel.objects.filter(name="GPT-5").update(is_active=False)
+        self.client.force_login(self.user)
+
+        response = self.client.post(self.api_url, self._payload(), content_type="application/json")
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("ai_model", response.json()["errors"])
+
+    def test_an_empty_model_is_allowed(self):
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            self.api_url, self._payload(ai_model=""), content_type="application/json"
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.json()["post"]["ai_model"], "")
+
+    def test_an_unconfigured_install_still_accepts_the_api(self):
+        """No rows at all = the operator hasn't set the list up; don't brick the API."""
+        from imagegen.models import AIModel
+
+        AIModel.objects.all().delete()
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            self.api_url,
+            self._payload(ai_model="WhateverModel"),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.json()["post"]["ai_model"], "WhateverModel")
+
+    def test_updates_are_validated_too(self):
+        from posts.views import _clean_ai_model
+
+        self.assertIsNone(_clean_ai_model("NotOnTheList"))
+        self.assertEqual(_clean_ai_model(""), "")
+        self.assertEqual(_clean_ai_model(None), "")
+        self.assertEqual(_clean_ai_model("  gpt-5  "), "GPT-5")
+
+
+class MediaPlayerMarkupTests(TestCase):
+    """Video/audio posts are handed to the platform player, never native chrome.
+
+    ``data-media-player`` is what static/js/player.js upgrades (base.html loads
+    it on every page); without it a post would fall back to the browser's own
+    controls — or to nothing at all.
+    """
+
+    def setUp(self):
+        self.author = get_user_model().objects.create_user(
+            username="media-author",
+            email="media-author@example.com",
+            password="test-password",
+        )
+        self.category = Category.objects.create(name="Media", slug="media")
+
+    def _media_post(self, post_type, filename, content):
+        post = _create_post(
+            self.author, self.category, f"A {post_type} post", post_type=post_type
+        )
+        # Attach bytes directly: this test asserts the page's markup, not the
+        # upload validator (covered by posts.test_validation).
+        getattr(post, post_type).save(filename, ContentFile(content), save=True)
+        return post
+
+    def test_a_video_post_renders_the_platform_player(self):
+        post = self._media_post(Post.PostType.VIDEO, "clip.mp4", b"fake-mp4-bytes")
+
+        response = self.client.get(reverse("web:post-detail", args=[post.slug]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, '<video src=', count=1)
+        self.assertContains(response, "data-media-player")
+        # The player script ships on the same page.
+        self.assertContains(response, "js/player.js")
+        # Native controls must never be offered as a fallback.
+        self.assertNotContains(response, "<video src=\"" + post.video.url + "\" controls")
+
+    def test_an_audio_post_renders_the_audio_card(self):
+        post = self._media_post(Post.PostType.AUDIO, "track.mp3", b"fake-mp3-bytes")
+
+        response = self.client.get(reverse("web:post-detail", args=[post.slug]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, '<audio src=', count=1)
+        self.assertContains(response, "data-media-player")
+        self.assertContains(response, 'class="detail-audio-card"')
+        self.assertContains(response, "js/player.js")
+
+    def test_the_create_page_also_loads_the_player(self):
+        """The create form previews media with the same player."""
+        response = self.client.get(reverse("web:create"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "js/player.js")

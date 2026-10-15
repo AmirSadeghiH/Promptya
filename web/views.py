@@ -16,7 +16,7 @@ from django.templatetags.static import static
 from django.urls import reverse
 
 from credits.challenges import INVITE_FRIEND, challenge_state
-from imagegen.models import AIConfig
+from imagegen.models import AIConfig, AIModel
 from imagegen.services import (
     MAX_PROMPT_LENGTH,
     credit_payload,
@@ -358,7 +358,9 @@ def category_page(request, slug):
     page, has_next, next_page = _paginate(request, queryset)
     labels = seo_labels(request)
 
-    count = queryset.count()
+    # Reuse the COUNT the paginator already ran instead of executing a
+    # second identical one.
+    count = page.paginator.count
     indexable = category.is_indexable
     own_text = " ".join((category.description or "").split())
     if own_text:
@@ -417,7 +419,7 @@ def tag_page(request, slug):
     page, has_next, next_page = _paginate(request, queryset)
     labels = seo_labels(request)
 
-    count = queryset.count()
+    count = page.paginator.count
     indexable = tag.is_indexable
     tag_path = _language_alternate_path("web:tag", tag.slug)
     listing_items = [_language_alternate_path("web:post-detail", post.slug) for post in page.object_list]
@@ -596,6 +598,9 @@ def _post_jsonld(request, post, description):
 def create_post_page(request):
     context = _base_context(request)
     context["category_options"] = Category.objects.all()
+    # The model select is fed from the admin-maintained list — posters choose,
+    # they never type (posts.views._clean_ai_model enforces the same list).
+    context["model_options"] = AIModel.objects.filter(is_active=True)
     labels = seo_labels(request)
     context.update(
         _meta_context(
@@ -722,8 +727,9 @@ def profile_page(request, username):
     page, has_next, next_page = _paginate(request, public_posts, PROFILE_POST_LIMIT)
     labels = seo_labels(request)
 
-    # The real total, not len() of a 24-item page.
-    count = public_posts.count()
+    # The real total, not len() of a 24-item page — and the one the Paginator
+    # already counted, not a second COUNT.
+    count = page.paginator.count
     indexable = user.is_indexable
     name = user.display_label
     own_text = " ".join((user.biography or "").split())
@@ -815,12 +821,17 @@ def saved_page(request):
     if not request.user.is_authenticated:
         return redirect("login")
 
-    save_rows = (
-        Save.objects.filter(user=request.user).select_related("post").order_by("-created_at")
+    # Ids only: the full post rows are re-fetched through post_list_queryset
+    # (counts, viewer flags, select_related), so select_related("post") here
+    # would load a second copy of every post for nothing.
+    saved_ids = list(
+        Save.objects.filter(user=request.user)
+        .order_by("-created_at")
+        .values_list("post_id", flat=True)
     )
-    posts = post_list_queryset(request.user).filter(pk__in=[r.post_id for r in save_rows])
+    posts = post_list_queryset(request.user).filter(pk__in=saved_ids)
     by_id = {p.pk: p for p in posts}
-    ordered = [by_id[r.post_id] for r in save_rows if r.post_id in by_id]
+    ordered = [by_id[post_id] for post_id in saved_ids if post_id in by_id]
     labels = seo_labels(request)
     context = {
         **_base_context(request),

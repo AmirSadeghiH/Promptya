@@ -1,5 +1,5 @@
 from notifications.models import Notification
-
+from django.urls import reverse, NoReverseMatch
 
 def create_notification(*, recipient, actor, notification_type, post=None, comment=None):
     """Create a notification for an interaction.
@@ -23,8 +23,28 @@ def unread_count(user):
 
 
 def serialize_notification(notification):
+    """The JSON/template shape of one notification.
+
+    ``post`` carries ``slug`` and ``url`` as well as ``id``/``title``: the
+    server-rendered notifications page links via ``n.post.slug``, and a payload
+    without it used to reverse an empty slug (NoReverseMatch -> 500) for every
+    like/save/comment notification.  Exactly one ``post`` key is emitted — a
+    duplicate key in the dict literal silently won and dropped the slug.
+    """
     post = notification.post
     comment = notification.comment
+    post_data = None
+    if post:
+        try:
+            post_url = reverse("web:post-detail", args=[post.slug]) if post.slug else None
+        except NoReverseMatch:
+            post_url = None
+        post_data = {
+            "id": post.id,
+            "title": post.title,
+            "slug": post.slug,
+            "url": post_url,
+        }
     return {
         "id": notification.id,
         "type": notification.notification_type,
@@ -40,6 +60,6 @@ def serialize_notification(notification):
                 else None
             ),
         },
-        "post": {"id": post.id, "title": post.title} if post else None,
+        "post": post_data,
         "comment": {"id": comment.id, "content": comment.content} if comment else None,
     }

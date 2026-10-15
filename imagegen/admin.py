@@ -2,7 +2,18 @@ from django.contrib import admin
 from django.utils.html import format_html
 
 from core.models import AuditLog, log_admin_action
-from imagegen.models import AIConfig, GeneratedImage
+from imagegen.models import AIConfig, AIModel, GeneratedImage
+
+
+@admin.register(AIModel)
+class AIModelAdmin(admin.ModelAdmin):
+    """The list posters choose from on the create form."""
+
+    list_display = ("name", "is_active", "position", "created_at")
+    list_editable = ("is_active", "position")
+    list_filter = ("is_active",)
+    search_fields = ("name",)
+    ordering = ("position", "name")
 
 
 @admin.register(AIConfig)

@@ -1,5 +1,5 @@
 {% extends "web/base.html" %}
-{% load seo_tags web_extras %}
+{% load static seo_tags web_extras %}
 {# Every title, description, canonical and robots directive comes from the view. #}
 
 {% block content %}
@@ -78,3 +78,11 @@
   </p>
 </section>
 {% endblock %}
+
+{% comment %}
+  The hero's own behaviour: pause/resume, prefers-reduced-motion, and parking the
+  11s loop while it is scrolled out of view. Loaded only on the home page, where
+  the hero exists — it used to be an inline <script> inside the partial, which
+  meant a <script> tag in the middle of <body> on every render.
+{% endcomment %}
+{% block scripts %}<script src="{% static 'js/motion-hero.js' %}" defer></script>{% endblock %}

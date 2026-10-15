@@ -74,8 +74,23 @@
       image: "Image",
       video: "Video",
       audio: "Audio",
+      // Home hero. MUST stay identical to `web/i18n_strings.py`; the pair is
+      // asserted equal by `web/tests.py::I18nTableParityTests`, because the
+      // failure mode is silent — by the time a key mismatch shows up it is
+      // already rendering as its own name on screen.
+      mh_caption: "One prompt. Infinite possibilities.",
+      mh_studio: "Open AI Studio",
+      mh_pause: "Pause animation",
+      mh_play: "Play animation",
+      mh_aria:
+        "Animation: one prompt becomes an image, a video and a soundtrack, then the Promptya logo.",
+      mh_prompt_1: "A glass whale over a sleeping city",
+      mh_prompt_2: "dawn light, soft haze, 35mm",
+      mh_generate: "Generate",
+      mh_tagline: "Create beyond imagination.",
       category: "Category",
       choose_category: "Choose a category…",
+      choose_model: "Choose a model…",
       ai_model: "AI model",
       optional: "(optional)",
       the_prompt: "The prompt",
@@ -245,6 +260,8 @@
       check_your_email: "Check your email",
       verification_expires: "The link expires in 24 hours.",
       back_to_login: "Back to login",
+      email_verified: "Email verified!",
+      verification_success_tagline: "Your email has been verified. You can now log in to your account.",
       email_hint: "We'll send a 6-digit verification code to this address.",
       // Email verification code
       verify_code_title: "Verify your email",
@@ -356,8 +373,20 @@
       image: "تصویر",
       video: "ویدیو",
       audio: "صدا",
+      // Home hero — see the English block above for why these are duplicated.
+      mh_caption: "یک پرامپت. بی‌نهایت امکان.",
+      mh_studio: "ورود به استودیو",
+      mh_pause: "توقف انیمیشن",
+      mh_play: "پخش انیمیشن",
+      mh_aria:
+        "انیمیشن: یک پرامپت به تصویر، ویدیو و موسیقی تبدیل می‌شود و سپس به لوگوی پرامپتیا.",
+      mh_prompt_1: "نهنگ شیشه‌ای بر فراز شهری خفته",
+      mh_prompt_2: "نور سحر، مه ملایم، ۳۵ میلی‌متری",
+      mh_generate: "بساز",
+      mh_tagline: "فراتر از خیال بساز.",
       category: "دسته‌بندی",
       choose_category: "یک دسته‌بندی انتخاب کنید…",
+      choose_model: "یک مدل انتخاب کنید…",
       ai_model: "مدل هوش مصنوعی",
       optional: "(اختیاری)",
       the_prompt: "متن پرامپت",
@@ -527,6 +556,8 @@
       check_your_email: "ایمیل خود را بررسی کنید",
       verification_expires: "این لینک ۲۴ ساعت اعتبار دارد.",
       back_to_login: "بازگشت به ورود",
+      email_verified: "ایمیل تأیید شد!",
+      verification_success_tagline: "ایمیل شما تأیید شد. اکنون می‌توانید به حساب خود وارد شوید.",
       email_hint: "یک کد تأیید ۶ رقمی به این نشانی ارسال می‌شود.",
       // کد تأیید ایمیل
       verify_code_title: "تأیید ایمیل",

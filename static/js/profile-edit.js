@@ -2,10 +2,22 @@
 (function () {
   "use strict";
 
-  const CSRF = document.cookie
-    .split("; ")
-    .find((row) => row.startsWith("csrftoken="))
-    ?.split("=")[1];
+  /* Same rule as app.js: the page may never have rendered a form, so the
+     * csrftoken cookie may be missing and every state-changing POST would then be
+     * rejected (403) before it ever reached the auth check (401).
+     * 
+     * The page always sets `<meta id="csrf-meta" name="csrf-token">` in the head,
+     * which is emitted from the same heading the page uses for its title and
+     * canonical — a single place that is on every page the reader can start on.
+     */
+  const CSRF = (function () {
+    var meta = document.getElementById("csrf-meta");
+    if (meta) return meta.content;
+    return document.cookie
+      .split("; ")
+      .find(function (row) { return row.startsWith("csrftoken="); })
+      ?.split("=")[1];
+  })();
 
   const toastEl = document.getElementById("toast");
   let toastTimer = null;

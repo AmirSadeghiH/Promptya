@@ -150,3 +150,53 @@ class NotificationApiTests(TestCase):
         response = self.client.post(reverse("notifications:read", args=[notification.pk]))
 
         self.assertEqual(response.status_code, 404)
+
+
+class NotificationsPageTests(TestCase):
+    """The server-rendered notifications page must survive post-linked rows.
+
+    ``serialize_notification`` used to declare the ``post`` key twice in one
+    dict literal; the second (id/title only) silently won, so ``n.post.slug``
+    resolved to an empty string and reversing the post-detail URL with it
+    raised NoReverseMatch — a 500 for every author with a single like.
+    """
+
+    def setUp(self):
+        self.author = get_user_model().objects.create_user(
+            username="page-author",
+            email="page-author@example.com",
+            password="test-password",
+        )
+        self.fan = get_user_model().objects.create_user(
+            username="page-fan",
+            email="page-fan@example.com",
+            password="test-password",
+        )
+        category = Category.objects.create(name="Page", slug="page-cat")
+        self.post = Post.objects.create(
+            author=self.author,
+            category=category,
+            post_type=Post.PostType.PROMPT,
+            title="Notified prompt",
+        )
+        Like.objects.create(post=self.post, user=self.fan)
+
+    def test_the_page_renders_and_links_the_liked_post(self):
+        self.client.force_login(self.author)
+
+        response = self.client.get(reverse("web:notifications"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, reverse("web:post-detail", args=[self.post.slug]))
+        self.assertContains(response, "Notified prompt")
+
+    def test_the_json_payload_carries_slug_and_url(self):
+        self.client.force_login(self.author)
+
+        response = self.client.get(reverse("notifications:list"))
+
+        post_payload = response.json()["results"][0]["post"]
+        self.assertEqual(post_payload["slug"], self.post.slug)
+        self.assertEqual(
+            post_payload["url"], reverse("web:post-detail", args=[self.post.slug])
+        )

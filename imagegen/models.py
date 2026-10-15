@@ -119,6 +119,47 @@ class AIConfig(models.Model):
         return bool(self.is_enabled and self.api_key)
 
 
+class AIModel(models.Model):
+    """A selectable AI model for post creation, maintained in the admin.
+
+    Posters pick from this list instead of typing a model name, so the
+    ``ai_model`` values on posts stay consistent (the search filter and the
+    post page's model line match on the exact string).  Deactivating a row
+    removes it from the create form without rewriting existing posts.
+    """
+
+    name = models.CharField(
+        max_length=100,
+        unique=True,
+        help_text="Exactly as it should appear on posts, e.g. “Midjourney”.",
+    )
+
+    is_active = models.BooleanField(
+        default=True,
+        help_text="Inactive models disappear from the create form; existing posts keep theirs.",
+    )
+
+    position = models.PositiveIntegerField(
+        default=0,
+        help_text="Order on the create form (lower numbers first).",
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["position", "name"]
+        verbose_name = "AI model"
+        verbose_name_plural = "AI models"
+
+    def __str__(self):
+        return self.name
+
+    @classmethod
+    def active_names(cls):
+        """The names a post may carry right now (cheapest possible query)."""
+        return list(cls.objects.filter(is_active=True).values_list("name", flat=True))
+
+
 class GeneratedImage(models.Model):
     """One AI generation attempt, successful or not."""
 

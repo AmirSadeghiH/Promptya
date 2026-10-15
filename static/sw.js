@@ -79,10 +79,19 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Pages: network-first, fall back to cache then offline page
+  // Pages: network-first, then store what the network hands back, then fall back
+  // to cache and the offline page. The request URL is used directly as the cache
+  // key so /en/feed/latest/ and /fa/feed/latest/ stay separate entries — a reader
+  // in one language never grays out the other language's feed.
   event.respondWith(
     fetch(request)
       .then((response) => {
+        if (!response.ok) {
+          // A non-2xx network response is still the freshest copy for this request.
+          // Hand it back so the reader sees the real server state (login redirect,
+          // 404, rate-limit page) rather than a stale 200 from another language.
+          return response;
+        }
         const copy = response.clone();
         caches.open(PAGE_CACHE).then((cache) => cache.put(request, copy));
         return response;

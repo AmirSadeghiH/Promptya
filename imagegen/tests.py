@@ -985,7 +985,9 @@ class UnauthorizedAccessTests(MediaTestCase):
         """API should reject invalid tier values."""
         from django.urls import reverse
         import json
+        from django.core.cache import cache
 
+        cache.clear()
         self.client.force_login(self.user)
         url = reverse("imagegen:generate")
         response = self.client.post(

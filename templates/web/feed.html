@@ -1,7 +1,9 @@
 {% extends "web/base.html" %}
 {% load seo_tags %}
-{# /feed/<variant>/ — a personalised or duplicate view of home/explore, so it is
-   noindex (set by the view) and never in the sitemap. The H1 names the variant. #}
+{% comment %}
+  /feed/<variant>/ — a personalised or duplicate view of home/explore, so it is
+  noindex (set by the view) and never in the sitemap. The H1 names the variant.
+{% endcomment %}
 
 {% block content %}
 {% if crumbs %}{% seo_breadcrumbs crumbs %}{% endif %}

@@ -8,6 +8,17 @@
   <meta name="format-detection" content="telephone=no">
   <meta name="robots" content="noindex, nofollow">
 
+  {% comment %}
+    The auth shell is standalone rather than extending web/base.html, so it has
+    to carry its own social card. Without this a shared /login/ or /signup/ link
+    rendered with no image at all — web/test_seo.py pins the default.
+  {% endcomment %}
+  <meta property="og:type" content="website">
+  <meta property="og:image" content="{{ og_image|default:default_og_image }}">
+  <meta property="og:image:alt" content="Promptya">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="{{ og_image|default:default_og_image }}">
+
   <title>{% block title %}Promptya{% endblock %}</title>
 
   <link rel="manifest" href="{% static 'manifest.webmanifest' %}">

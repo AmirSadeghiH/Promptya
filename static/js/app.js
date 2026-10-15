@@ -2,10 +2,55 @@
 (function () {
   "use strict";
 
-  const CSRF = document.cookie
-    .split("; ")
-    .find((row) => row.startsWith("csrftoken="))
-    ?.split("=")[1];
+  /* The visitor may land on a page that never rendered a form — `/`,
+     the feed, the studio — and those pages do not call `{% csrf_token %}`,
+     so no `csrftoken` cookie is set. The Like / Save / Create / Studio
+     POSTs would be rejected at the CSRF layer (403) before they ever reached
+     the auth check (401).
+
+     The auth pages *do* render `{% csrf_token %}` and set the cookie, so when
+     a reader lands there and later visits a feed page the token is already in
+     the jar. But that is not the common path for a new visitor, and it is not
+     the path the Like flow needs.
+
+     The page set `csrftoken` in a `<meta name="csrf-token">` tag in the head, so
+     even the first interaction always has a token. Falls back to the cookie so
+     pages that do set it through a form keep using it directly, and so the
+     studio's multi-step flow keeps a cookie copy it already relies on. */
+  const CSRF = (function () {
+    var meta = document.getElementById("csrf-meta");
+    if (meta) return meta.content;
+    return document.cookie
+      .split("; ")
+      .find(function (row) { return row.startsWith("csrftoken="); })
+      ?.split("=")[1];
+  })();
+
+  /* Resolve a fetch response the way every caller here expects: the parsed
+     body on success, and on failure the parsed body *plus* the HTTP status.
+
+     The status lives on the Response, never inside the body — Django returns
+     `{"error": "Authentication required."}` with no status field — so rejecting
+     with the body alone left `err.status` undefined and made the
+     "log in to like" branch unreachable: a signed-out visitor got "Something
+     went wrong" instead of being sent to log in. Statuses are now attached to
+     the same object rather than wrapped in `{status, data}`, because callers
+     read `.errors` / `.detail` off the top of the rejection.
+
+     A non-JSON body (Django's CSRF failure page is HTML) rejects with the
+     status alone instead of throwing a SyntaxError at the caller. */
+  function settle(r) {
+    if (r.ok) return r.json();
+    return r.json().then(
+      (body) =>
+        Promise.reject(
+          body && typeof body === "object"
+            ? Object.assign(body, { status: r.status })
+            : { status: r.status, detail: body }
+        ),
+      () => Promise.reject({ status: r.status })
+    );
+  }
 
   function post(url, body) {
     return fetch(url, {
@@ -16,7 +61,7 @@
       },
       credentials: "same-origin",
       body: JSON.stringify(body || {}),
-    }).then((r) => (r.ok ? r.json() : r.json().then(Promise.reject.bind(Promise))));
+    }).then(settle);
   }
 
   /* ---------------- Toast ---------------- */
@@ -69,9 +114,18 @@
           if (action === "save") toast(data.saved ? t("saved_toast") : t("removed_from_saved"));
         })
         .catch((err) => {
-          if (err && err.status === 403) {
+          /* 401 is what the API returns for an anonymous session — 403 is a
+             genuine permission failure (or a bad CSRF token), which is *not*
+             something logging in would fix. studio.js already branches on 401
+             for the same reason. `/login/` stays unprefixed deliberately:
+             /en/login/ and /fa/login/ are 404s, auth lives outside the
+             language prefixes. */
+          if (err && err.status === 401) {
             toast(t("login_to_do_that"));
-            setTimeout(() => (window.location.href = "/login/"), 900);
+            setTimeout(() => {
+              const loginUrl = "/login/";
+              window.location.href = loginUrl;
+            }, 900);
           } else {
             toast(t("something_wrong"));
           }
@@ -90,15 +144,22 @@
 
     if (action === "copy") {
       e.preventDefault();
-      const card = btn.closest("[data-post-id]");
       const pre = document.querySelector(".prompt-box pre");
       const text = pre ? pre.textContent.trim() : "";
-      copyText(text || postId).then(() => {
-        const original = btn.textContent;
-        btn.textContent = t("copied");
+      if (!text) return;
+      /* The copy control is an icon-only button, so feedback must not touch
+         textContent — that would wipe the SVG and leave an empty square.
+         Swap the whole icon to a check, then restore it. */
+      const CHECK_SVG =
+        '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>';
+      const originalHtml = btn.innerHTML;
+      copyText(text).then(() => {
+        btn.innerHTML = CHECK_SVG;
         toast(t("copy_toast"));
         post(`/api/posts/${postId}/copy/`).catch(() => {});
-        setTimeout(() => (btn.textContent = original), 1500);
+        setTimeout(() => {
+          btn.innerHTML = originalHtml;
+        }, 1500);
       });
     }
   });
@@ -266,7 +327,7 @@
         credentials: "same-origin",
         body: fd,
       })
-        .then((r) => (r.ok ? r.json() : r.json().then(Promise.reject.bind(Promise))))
+        .then(settle)
         .then((data) => {
           toast(t("published_toast"));
           setTimeout(() => (window.location.href = `/post/${encodeURIComponent(data.post.slug)}/`), 700);

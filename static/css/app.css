@@ -32,6 +32,8 @@
      24  Toast & loading states
      25  Direction (RTL/LTR)
      26  Responsive
+     27  Home hero ("motion graphic")
+     28  Touch targets (pointer: coarse)
    ========================================================================== */
 
 
@@ -1685,6 +1687,25 @@ body.nav-open {
 .copy-btn .icon {
   width: 15px;
   height: 15px;
+}
+
+/* The post page's only copy affordance: an icon-sized button pinned to the
+   prompt box's top-right corner (the head row is space-between, so it lands
+   there by layout). Big enough to hit, small enough to stay a corner detail. */
+.prompt-copy-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.35rem 0.45rem;
+  flex: 0 0 auto;
+}
+.prompt-copy-btn .icon {
+  width: 16px;
+  height: 16px;
+}
+.prompt-copy-btn:focus-visible {
+  outline: 2px solid var(--accent, currentColor);
+  outline-offset: 1px;
 }
 
 
@@ -4367,3 +4388,1136 @@ html[dir="rtl"] select {
 }
 
 
+
+/* ==========================================================================
+   27  Home hero ("motion graphic")
+   --------------------------------------------------------------------------
+   The panel at the top of `web/home.html`: one prompt becomes an image, a
+   video and a soundtrack, then the brand.
+
+   This CSS used to live in a ~380-line <style> block *inside* the partial that
+   rendered the hero. That copy re-declared the design tokens by hand (--bg,
+   --bg-card, --accent, --border, --text, --shadow-2, --radius-lg, --sp-5 …),
+   which quietly broke the "retheming is a single edit" invariant §01 promises
+   — and it shipped a full <html>/<head>/<body> with it, which is why the hero
+   is now a proper partial and this is a proper section.
+
+   What stayed local, deliberately: the animation variables below. They are the
+   hero's own geometry (how far the card travels, where the outputs land), not
+   design tokens, so they belong to the hero and nothing else reads them.
+   Everything else resolves to §01.
+   ========================================================================== */
+
+.mh {
+  --mh-t: 11s;
+  --dir: 1;
+  --k: 1;
+  --sy0: 0px;
+
+  --mh-stage: #0b0a12;
+  --mh-dot: rgba(255, 255, 255, 0.055);
+  --mh-glow: rgba(124, 92, 255, 0.26);
+  --mh-glow-2: rgba(34, 211, 238, 0.09);
+  --mh-card: var(--bg-card);
+  --mh-ink: var(--text);
+  --mh-wire: rgba(168, 147, 255, 0.55);
+  --mh-spark: #ffffff;
+
+  /* Resting positions of the prompt card and the three output tiles. */
+  --cx: -212px;
+  --cy: 0px;
+  --cs: 0.84;
+  --ix: 35px;
+  --iy: 0px;
+  --vx: 248px;
+  --vy: -46px;
+  --ax: 248px;
+  --ay: 72px;
+
+  position: relative;
+  height: 400px;
+  margin: 0 0 var(--sp-6);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  background: var(--mh-stage);
+  overflow: hidden;
+  isolation: isolate;
+  color: var(--mh-ink);
+  /* The scene's own responsive behaviour is container-driven, so the panel can
+     sit at any column width without a viewport breakpoint per tile. */
+  container-type: inline-size;
+  contain: layout paint style;
+}
+
+/* --dir flips the whole composition for RTL, so every horizontal offset is
+   written as calc(<value> * var(--dir)) and the asymmetric bits are mirrored
+   explicitly. Nothing here needs a second dir="rtl" stylesheet. */
+:root[dir="rtl"] .mh {
+  --dir: -1;
+}
+
+:root[data-theme="light"] .mh {
+  --mh-stage: #fcfcfe;
+  --mh-dot: rgba(23, 23, 31, 0.07);
+  --mh-glow: rgba(91, 61, 245, 0.15);
+  --mh-glow-2: rgba(59, 130, 246, 0.08);
+  --mh-wire: rgba(91, 61, 245, 0.45);
+  --mh-spark: #5b3df5;
+}
+
+/* ---- Caption bar ------------------------------------------------------- */
+
+.mh-bar {
+  position: absolute;
+  z-index: 3;
+  inset: 16px 18px auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+}
+.mh-caption {
+  margin: 0;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+.mh-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+.mh-studio {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 32px;
+  padding: 0 0.8rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-pill);
+  background: var(--subtle-fill);
+  color: var(--text);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  transition: border-color var(--dur-2) var(--ease),
+    background var(--dur-2) var(--ease);
+}
+.mh-studio:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.mh-arrow {
+  width: 15px;
+  height: 15px;
+  transition: transform var(--dur-3) var(--ease);
+}
+.mh-studio:hover .mh-arrow {
+  transform: translate(calc(3px * var(--dir)));
+}
+:root[dir="rtl"] .mh-arrow {
+  transform: scaleX(-1);
+}
+:root[dir="rtl"] .mh-studio:hover .mh-arrow {
+  transform: scaleX(-1) translate(3px);
+}
+.mh-toggle {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: 50%;
+  background: var(--subtle-fill);
+  color: var(--text-secondary);
+  transition: color var(--dur-2) var(--ease), border-color var(--dur-2) var(--ease);
+}
+.mh-toggle:hover {
+  color: var(--text);
+  border-color: var(--text-muted);
+}
+.mh-toggle svg {
+  width: 13px;
+  height: 13px;
+}
+/* The glyph swap is driven by .is-paused on the panel, never by JS text. */
+.mh-ico-play,
+.mh-lbl-play {
+  display: none;
+}
+.mh.is-paused .mh-ico-play,
+.mh.is-paused .mh-lbl-play {
+  display: block;
+}
+.mh.is-paused .mh-ico-pause,
+.mh.is-paused .mh-lbl-pause {
+  display: none;
+}
+
+/* ---- Stage ------------------------------------------------------------- */
+
+.mh-stage {
+  position: absolute;
+  inset: 0;
+}
+.mh-defs {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
+.mh-bg {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at center, var(--mh-dot) 1px, transparent 1.4px)
+    0 0 / 22px 22px;
+  -webkit-mask-image: radial-gradient(70% 75% at 50% 52%, #000 20%, transparent 80%);
+  mask-image: radial-gradient(70% 75% at 50% 52%, #000 20%, transparent 80%);
+}
+.mh-aura {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 640px;
+  height: 640px;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, var(--mh-glow), transparent 72%),
+    radial-gradient(40% 40% at 70% 30%, var(--mh-glow-2), transparent 80%);
+  opacity: 0.8;
+  pointer-events: none;
+}
+.mh-scene {
+  position: absolute;
+  inset: 0;
+  transform: translateY(var(--sy0)) scale(var(--k));
+}
+.mh-scene > * {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+}
+
+/* ---- The spark --------------------------------------------------------- */
+
+.mh-spark {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--mh-spark);
+  box-shadow: 0 0 12px 3px #a893ffb3, 0 0 36px 10px #7c5cff59;
+  opacity: 0;
+}
+.mh-trail {
+  width: 200px;
+  height: 1px;
+  opacity: 0;
+  background: linear-gradient(90deg, transparent, rgba(168, 147, 255, 0.9));
+}
+.mh-trail--a {
+  transform-origin: 100% 50%;
+  translate: -100px 0;
+}
+.mh-trail--b {
+  transform-origin: 0 50%;
+  translate: 100px 0;
+  background: linear-gradient(270deg, transparent, rgba(168, 147, 255, 0.9));
+}
+.mh-dust {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--accent-text);
+  opacity: 0;
+}
+
+/* ---- The prompt card --------------------------------------------------- */
+
+.mh-card {
+  z-index: 2;
+  box-sizing: border-box;
+  width: 356px;
+  height: 176px;
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--mh-card);
+  box-shadow: var(--shadow-3), 0 0 0 1px #7c5cff0f, 0 0 48px var(--prompt-glow);
+  transform: translate(calc(var(--cx) * var(--dir)), var(--cy)) scale(var(--cs));
+}
+.mh-card::before {
+  content: "";
+  position: absolute;
+  inset: -1px 24px auto;
+  height: 1px;
+  background: var(--brand-gradient);
+  opacity: 0.85;
+}
+.mh-card-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.mh-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--brand-gradient);
+  box-shadow: inset 0 0 0 2px var(--mh-card);
+}
+.mh-handle {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--text);
+}
+.mh-chip {
+  margin-inline-start: auto;
+  padding: 2px 9px;
+  border-radius: var(--radius-pill);
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+}
+.mh-prompt {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-family: var(--mono);
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--code-text);
+}
+html[lang="fa"] .mh-prompt {
+  font-family: var(--font);
+  font-size: 15px;
+  line-height: 1.75;
+}
+.mh-line {
+  position: relative;
+  display: block;
+  width: fit-content;
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: clip;
+  unicode-bidi: plaintext;
+}
+.mh-line:last-child {
+  color: var(--text-secondary);
+}
+/* The wipe that "types" the prompt, mirrored for RTL. */
+.mh-cover {
+  position: absolute;
+  inset: 0 -4px 0 0;
+  background: var(--mh-card);
+  transform: translate(calc(var(--dir) * 102%));
+}
+:root[dir="rtl"] .mh-cover {
+  inset: 0 0 0 -4px;
+}
+.mh-cover::before {
+  content: "";
+  position: absolute;
+  inset-block: 3px;
+  inset-inline-start: 0;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--accent);
+  opacity: 0;
+}
+.mh-card-foot {
+  margin-top: auto;
+  display: flex;
+  justify-content: flex-end;
+}
+.mh-go {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  color: var(--accent-contrast);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  box-shadow: var(--shadow-accent);
+}
+.mh-go svg {
+  width: 14px;
+  height: 14px;
+}
+.mh-cost {
+  padding-inline-start: 7px;
+  border-inline-start: 1px solid rgba(255, 255, 255, 0.3);
+  font-family: var(--mono);
+  font-size: var(--fs-xs);
+  opacity: 0.9;
+}
+.mh-go::after {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  box-shadow: 0 0 0 2px var(--accent);
+  opacity: 0;
+}
+
+/* ---- Wires, nodes, outputs -------------------------------------------- */
+
+.mh-wires {
+  width: 600px;
+  height: 200px;
+  overflow: visible;
+  transform: scaleX(var(--dir));
+  fill: none;
+  stroke: var(--mh-wire);
+  stroke-width: 1;
+  stroke-dasharray: 64;
+  stroke-dashoffset: 64;
+  opacity: 0;
+}
+.mh-node {
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid var(--border-strong);
+  background: var(--mh-card);
+  color: var(--accent-text);
+  box-shadow: 0 0 0 4px #7c5cff14;
+  opacity: 0;
+  transform: translate(calc(236px * var(--dir)), var(--ny));
+}
+.mh-node svg {
+  width: 14px;
+  height: 14px;
+}
+
+.mh-out {
+  z-index: 1;
+  overflow: hidden;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: #120d2b;
+  box-shadow: var(--shadow-2);
+  transform: translate(calc(var(--ox) * var(--dir)), var(--oy));
+}
+.mh-out--image {
+  --ox: var(--ix);
+  --oy: var(--iy);
+  width: 140px;
+  height: 200px;
+}
+.mh-out--video {
+  --ox: var(--vx);
+  --oy: var(--vy);
+  width: 230px;
+  height: 128px;
+}
+.mh-out--audio {
+  --ox: var(--ax);
+  --oy: var(--ay);
+  width: 230px;
+  height: 76px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px;
+  box-sizing: border-box;
+  background: var(--mh-card);
+}
+.mh-art {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.mh-whale {
+  position: absolute;
+  width: 62%;
+  inset-inline-start: 18%;
+  top: 30%;
+  height: auto;
+}
+.mh-out--video .mh-whale {
+  width: 38%;
+  top: 24%;
+  inset-inline-start: 22%;
+}
+:root[dir="rtl"] .mh-whale {
+  scale: -1 1;
+}
+.mh-veil {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(60% 50% at 40% 40%, rgba(168, 147, 255, 0.9), transparent 70%),
+    linear-gradient(160deg, #2a1d63, #120d2b 60%, #3b2a7a);
+  opacity: 0;
+}
+.mh-scan {
+  position: absolute;
+  height: 2px;
+  inset: 0 0 auto;
+  background: linear-gradient(90deg, transparent, #e9e4ff 30%, #9fe8ff 70%, transparent);
+  box-shadow: 0 0 10px 2px #a893ff99;
+  opacity: 0;
+}
+.mh-badge {
+  position: absolute;
+  top: 8px;
+  inset-inline-start: 8px;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--media-overlay);
+  color: var(--media-badge-text);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  line-height: 1.5;
+}
+.mh-play {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: #0a0a0f73;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  color: #fff;
+}
+.mh-play svg,
+.mh-aplay svg {
+  width: 14px;
+  height: 14px;
+}
+.mh-track {
+  position: absolute;
+  inset: auto 10px 10px;
+  height: 3px;
+  border-radius: 2px;
+  background: #ffffff40;
+  overflow: hidden;
+}
+.mh-progress {
+  position: absolute;
+  inset: 0;
+  background: #fff;
+  transform-origin: 0 50%;
+  transform: scaleX(0.45);
+}
+:root[dir="rtl"] .mh-progress {
+  transform-origin: 100% 50%;
+}
+.mh-time {
+  position: absolute;
+  inset: auto auto 18px 10px;
+  font-family: var(--mono);
+  font-size: var(--fs-xs);
+  color: #ffffffd9;
+}
+.mh-aplay {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--accent);
+  color: var(--accent-contrast);
+}
+.mh-wave {
+  flex: 1;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-width: 0;
+}
+.mh-wave i {
+  width: 3px;
+  height: calc(var(--h) * 4px + 4px);
+  border-radius: 2px;
+  background: var(--brand-gradient);
+  background-size: 1px 40px;
+  transform: scaleY(0.7);
+}
+.mh-atime {
+  font-family: var(--mono);
+  font-size: var(--fs-xs);
+  color: var(--text-secondary);
+}
+
+/* ---- The reveal -------------------------------------------------------- */
+
+.mh-ring {
+  width: 180px;
+  height: 180px;
+  border-radius: 50%;
+  border: 1px solid rgba(168, 147, 255, 0.7);
+  opacity: 0;
+}
+.mh-brand {
+  z-index: 4;
+  width: max-content;
+  height: max-content;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  opacity: 0;
+  pointer-events: none;
+}
+.mh-mark {
+  width: 64px;
+  height: 64px;
+  border-radius: 16px;
+  box-shadow: 0 10px 40px #7c5cff59;
+}
+.mh-word {
+  display: block;
+  overflow: hidden;
+  padding-bottom: 2px;
+}
+.mh-word > span {
+  display: block;
+  font-size: 34px;
+  line-height: 1.15;
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  color: var(--text);
+}
+.mh-tagline {
+  font-size: var(--fs-md);
+  color: var(--text-secondary);
+}
+
+/* ---- Animation wiring -------------------------------------------------- */
+/* One duration and one iteration count for the whole loop, so the keyframe
+   sets stay in step; each layer below names only its own animation. */
+
+.mh-aura,
+.mh-spark,
+.mh-trail,
+.mh-dust,
+.mh-card,
+.mh-cover,
+.mh-cover::before,
+.mh-go,
+.mh-go::after,
+.mh-wires,
+.mh-node,
+.mh-out,
+.mh-veil,
+.mh-scan,
+.mh-whale,
+.mh-progress,
+.mh-wave i,
+.mh-ring,
+.mh-brand,
+.mh-mark,
+.mh-word > span,
+.mh-tagline {
+  animation-duration: var(--mh-t);
+  animation-iteration-count: infinite;
+  animation-timing-function: var(--ease);
+  animation-fill-mode: both;
+}
+
+.mh-aura { animation-name: mh-aura; }
+.mh-spark { animation-name: mh-spark; }
+.mh-trail { animation-name: mh-trail; }
+.mh-dust { animation-name: mh-dust; animation-delay: var(--d); }
+.mh-card { animation-name: mh-card; }
+.mh-cover--1 { animation-name: mh-type-1; }
+.mh-cover--2 { animation-name: mh-type-2; }
+.mh-cover--1::before { animation-name: mh-caret-1; }
+.mh-cover--2::before { animation-name: mh-caret-2; }
+.mh-go { animation-name: mh-press; }
+.mh-go::after { animation-name: mh-ripple; }
+.mh-wires { animation-name: mh-wires; }
+.mh-node { animation-name: mh-node; animation-delay: var(--d); }
+.mh-out { animation-name: mh-out; }
+.mh-out--video { animation-delay: 70ms; }
+.mh-out--audio { animation-delay: 0.14s; }
+.mh-veil { animation-name: mh-veil; }
+.mh-scan { animation-name: mh-scan; }
+.mh-whale { animation-name: mh-drift; animation-timing-function: ease-in-out; }
+.mh-progress { animation-name: mh-progress; animation-timing-function: linear; }
+.mh-wave i { animation-name: mh-bar; animation-delay: calc(var(--i) * 22ms); }
+.mh-ring { animation-name: mh-ring; }
+.mh-brand { animation-name: mh-brand; }
+.mh-mark { animation-name: mh-mark; }
+.mh-word > span { animation-name: mh-word; }
+.mh-tagline { animation-name: mh-tag; }
+
+@keyframes mh-aura {
+  0% { opacity: 0; transform: scale(0.55); }
+  9% { opacity: 0.75; transform: scale(0.75); }
+  22% { opacity: 0.6; transform: scale(0.95); }
+  42% { opacity: 0.95; transform: scale(1.08); }
+  64% { opacity: 0.65; transform: scale(1); }
+  76% { opacity: 1; transform: scale(0.7); }
+  90% { opacity: 0.75; transform: scale(0.85); }
+  99%, to { opacity: 0; transform: scale(0.55); }
+}
+@keyframes mh-spark {
+  0%, 2% { opacity: 0; transform: translateY(0) scale(0); }
+  7% { opacity: 1; transform: translateY(0) scale(1); }
+  10.5% { opacity: 1; transform: translateY(0) scale(1.5); }
+  15% { opacity: 1; transform: translateY(-88px) scale(30, 0.25); }
+  18% { opacity: 0; transform: translateY(-88px) scale(40, 0.15); }
+  to { opacity: 0; transform: translateY(0) scale(0); }
+}
+@keyframes mh-trail {
+  0%, 2.5% { opacity: 0; transform: scaleX(0); }
+  7.5% { opacity: 0.9; transform: scaleX(1); }
+  12% { opacity: 0; transform: scaleX(0.2); }
+  to { opacity: 0; transform: scaleX(0); }
+}
+@keyframes mh-dust {
+  0%, 1% { opacity: 0; transform: translate(calc(var(--dx) * var(--dir)), var(--dy)); }
+  4% { opacity: 0.9; }
+  10% { opacity: 0; transform: translate(0); }
+  to { opacity: 0; transform: translate(0); }
+}
+@keyframes mh-card {
+  0%, 12.5% { opacity: 0; transform: translateY(16px) scale(0.965); }
+  18% { opacity: 1; transform: translate(0) scale(1); }
+  40% { opacity: 1; transform: translate(0) scale(1); }
+  49%, 67% {
+    opacity: 1;
+    transform: translate(calc(var(--cx) * var(--dir)), var(--cy)) scale(var(--cs));
+  }
+  75% { opacity: 0; transform: translate(0) scale(0.4); }
+  to { opacity: 0; transform: translateY(16px) scale(0.965); }
+}
+@keyframes mh-type-1 {
+  0%, 18.5% {
+    transform: translate(0);
+    animation-timing-function: cubic-bezier(0.45, 0.05, 0.55, 0.95);
+  }
+  27%, to { transform: translate(calc(var(--dir) * 102%)); }
+}
+@keyframes mh-type-2 {
+  0%, 27.5% {
+    transform: translate(0);
+    animation-timing-function: cubic-bezier(0.45, 0.05, 0.55, 0.95);
+  }
+  33.5%, to { transform: translate(calc(var(--dir) * 102%)); }
+}
+@keyframes mh-caret-1 {
+  0%, 17.5% { opacity: 0; }
+  18.5%, 27% { opacity: 1; }
+  27.5%, to { opacity: 0; }
+}
+@keyframes mh-caret-2 {
+  0%, 27% { opacity: 0; }
+  27.5%, 35% { opacity: 1; }
+  36.5%, to { opacity: 0; }
+}
+@keyframes mh-wires {
+  0%, 33% { opacity: 0; stroke-dashoffset: 64; }
+  34% { opacity: 1; }
+  38% { opacity: 1; stroke-dashoffset: 0; }
+  42% { opacity: 1; stroke-dashoffset: 0; }
+  45%, to { opacity: 0; stroke-dashoffset: 0; }
+}
+@keyframes mh-node {
+  0%, 34.5% {
+    opacity: 0;
+    transform: translate(calc(236px * var(--dir)), var(--ny)) scale(0.4);
+  }
+  37.5% {
+    opacity: 1;
+    transform: translate(calc(236px * var(--dir)), var(--ny)) scale(1);
+  }
+  41% {
+    opacity: 1;
+    transform: translate(calc(236px * var(--dir)), var(--ny)) scale(1);
+  }
+  44.5% {
+    opacity: 0;
+    transform: translate(calc(250px * var(--dir)), var(--ny)) scale(1.5);
+  }
+  to {
+    opacity: 0;
+    transform: translate(calc(236px * var(--dir)), var(--ny)) scale(0.4);
+  }
+}
+@keyframes mh-press {
+  0%, 37% { transform: scale(1); }
+  38.5% { transform: scale(0.93); }
+  40.5% { transform: scale(1.03); }
+  42%, to { transform: scale(1); }
+}
+@keyframes mh-ripple {
+  0%, 38.5% { opacity: 0; transform: scale(1); }
+  39.5% { opacity: 0.9; transform: scale(1); }
+  45% { opacity: 0; transform: scale(1.35, 1.7); }
+  to { opacity: 0; transform: scale(1); }
+}
+@keyframes mh-out {
+  0%, 40.5% { opacity: 0; transform: translate(0) scale(0.3); }
+  43% { opacity: 1; }
+  49.5%, 67% {
+    opacity: 1;
+    transform: translate(calc(var(--ox) * var(--dir)), var(--oy)) scale(1);
+  }
+  75.5% { opacity: 0; transform: translate(0) scale(0.3); }
+  to { opacity: 0; transform: translate(0) scale(0.3); }
+}
+@keyframes mh-veil {
+  0%, 44% { opacity: 1; }
+  53%, to { opacity: 0; }
+}
+@keyframes mh-scan {
+  0%, 43% { opacity: 0; transform: translateY(0); }
+  44% { opacity: 1; transform: translateY(0); }
+  52.5% { opacity: 1; transform: translateY(var(--scan, 200px)); }
+  54%, to { opacity: 0; transform: translateY(var(--scan, 200px)); }
+}
+.mh-out--video { --scan: 128px; }
+@keyframes mh-drift {
+  0%, 44% { transform: translate(calc(-6px * var(--dir)), 3px); }
+  70% { transform: translate(calc(10px * var(--dir)), -3px); }
+  to { transform: translate(calc(-6px * var(--dir)), 3px); }
+}
+@keyframes mh-progress {
+  0%, 49% { transform: scaleX(0.02); }
+  68% { transform: scaleX(0.9); }
+  to { transform: scaleX(0.02); }
+}
+@keyframes mh-bar {
+  0%, 45% { transform: scaleY(0.12); }
+  50% { transform: scaleY(1); }
+  53.5% { transform: scaleY(0.5); }
+  57% { transform: scaleY(0.95); }
+  60.5% { transform: scaleY(0.4); }
+  64% { transform: scaleY(0.85); }
+  70% { transform: scaleY(0.12); }
+  to { transform: scaleY(0.12); }
+}
+@keyframes mh-ring {
+  0%, 71% { opacity: 0; transform: scale(0.2); }
+  73.5% { opacity: 0.8; }
+  83% { opacity: 0; transform: scale(2); }
+  to { opacity: 0; transform: scale(0.2); }
+}
+@keyframes mh-brand {
+  0%, 71.5% { opacity: 0; }
+  73%, 93.5% { opacity: 1; }
+  98.5%, to { opacity: 0; }
+}
+@keyframes mh-mark {
+  0%, 71.5% { transform: scale(0.55) rotate(-8deg); }
+  79%, to { transform: scale(1) rotate(0); }
+}
+@keyframes mh-word {
+  0%, 75% { transform: translateY(105%); }
+  81.5%, to { transform: translateY(0); }
+}
+@keyframes mh-tag {
+  0%, 79% { opacity: 0; transform: translateY(6px); }
+  85%, to { opacity: 1; transform: translateY(0); }
+}
+
+/* ---- Paused / offscreen / still ---------------------------------------- */
+/* animation-play-state rather than animation:none: the loop keeps its position,
+   so resuming does not restart the story from the spark. */
+
+.mh.is-paused *,
+.mh.is-paused *::before,
+.mh.is-paused *::after,
+.mh.is-offscreen *,
+.mh.is-offscreen *::before,
+.mh.is-offscreen *::after {
+  animation-play-state: paused !important;
+}
+.mh.is-still *,
+.mh.is-still *::before,
+.mh.is-still *::after {
+  animation: none !important;
+}
+.mh.is-still .mh-toggle {
+  display: none;
+}
+
+/* ---- Compact brand strip (phones) -------------------------------------- */
+/* Hidden above 640px, where the animated stage is doing the work. */
+
+.mh-compact {
+  display: none;
+  align-items: center;
+  gap: 10px;
+}
+.mh-compact-mark {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  flex-shrink: 0;
+  box-shadow: var(--shadow-accent);
+}
+.mh-compact-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.mh-compact-word {
+  font-size: var(--fs-lg);
+  font-weight: 700;
+  letter-spacing: var(--tracking-tight);
+  color: var(--text);
+}
+.mh-compact-tag {
+  font-size: var(--fs-xs);
+  color: var(--text-secondary);
+}
+
+/* ---- Container queries: the scene scales with the panel ---------------- */
+
+@container (max-width: 840px) {
+  .mh-scene { --k: 0.88; }
+}
+@container (max-width: 720px) {
+  .mh-scene { --k: 0.76; }
+}
+@container (max-width: 620px) {
+  .mh-scene { --k: 0.68; }
+  .mh-studio span { display: none; }
+  .mh-studio { padding: 0 0.55rem; }
+}
+@container (max-width: 560px) {
+  .mh-scene {
+    --k: 1;
+    --sy0: 18px;
+    --cx: 0px;
+    --cy: -74px;
+    --cs: 0.84;
+    --ix: -108px;
+    --iy: 76px;
+    --vx: 0px;
+    --vy: 76px;
+    --ax: 108px;
+    --ay: 76px;
+  }
+  .mh-dust,
+  .mh-trail,
+  .mh-wires,
+  .mh-node,
+  .mh-studio { display: none; }
+  .mh-card { width: 316px; }
+  .mh-prompt { font-size: 13px; }
+  .mh-out--image,
+  .mh-out--video,
+  .mh-out--audio { width: 96px; height: 96px; }
+  .mh-out--video,
+  .mh-out--image { --scan: 96px; }
+  .mh-out--video .mh-whale,
+  .mh-whale { width: 70%; inset-inline-start: 14%; top: 34%; }
+  .mh-out--video .mh-time { display: none; }
+  .mh-play { width: 28px; height: 28px; }
+  .mh-out--audio { flex-direction: column; justify-content: center; gap: 8px; padding: 10px; }
+  .mh-aplay { width: 28px; height: 28px; }
+  .mh-wave { flex: none; width: 100%; height: 28px; }
+  .mh-wave i { width: 2px; height: calc(var(--h) * 2.6px + 3px); }
+  .mh-atime,
+  .mh-badge { display: none; }
+  .mh-word > span { font-size: 30px; }
+}
+
+/* ---- Phones: the panel becomes a 168px banner -------------------------- */
+/* Audit finding S1-1. At 390x844 the old 380px panel pushed the first post
+   card to y=822 — an 844px screen showed 22px of feed. The scene is suppressed
+   rather than shrunk: its own container query at <=560px already collapses the
+   tiles into overlapping 96px squares with the prompt text at 13px, which reads
+   as clutter, not as a story. So the brand stands up instead.
+
+   .mh-bar has to leave position:absolute here: with .mh-stage out of flow there
+   is nothing left to position against, and the bar would collapse to zero
+   height inside a fixed-height panel.
+
+   These rules are declared after the @container block on purpose. Both apply at
+   equal specificity, so source order decides — and `.mh-studio span` has to win
+   its label back, because the <=620px container query would otherwise strip the
+   CTA down to a bare arrow inside a full-width 44px button. */
+
+@media (max-width: 640px) {
+  .mh {
+    height: 168px;
+    margin-bottom: var(--sp-5);
+    border-radius: var(--radius-lg);
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 12px;
+  }
+  .mh-stage { display: none; }
+  .mh-compact { display: flex; order: -1; }
+  .mh-caption { display: none; }
+  .mh-toggle { display: none; }
+  .mh-bar {
+    position: static;
+    padding: 0;
+  }
+  .mh-actions { width: 100%; }
+  .mh-studio {
+    width: 100%;
+    justify-content: center;
+    min-height: 44px;
+  }
+  .mh-studio span { display: inline; }
+  .mh-studio:hover .mh-arrow,
+  :root[dir="rtl"] .mh-studio:hover .mh-arrow { transform: none; }
+}
+
+@media (max-width: 400px) {
+  .mh-caption { font-size: var(--fs-xs); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mh *,
+  .mh *::before,
+  .mh *::after {
+    animation: none !important;
+  }
+  .mh-toggle { display: none; }
+}
+
+/* ============================================================================
+   Touch targets — pointer: coarse only
+   ============================================================================
+   WCAG 2.5.5 asks for 44x44; 2.5.8 (AA) asks for 24x24 with spacing. Measured
+   on a phone, every control in the audit missed 44 on at least one axis — and
+   the miss is felt: the password eye lands next to the keyboard, the theme
+   switch next to the language pill, the Like under a thumb.
+
+   Two techniques, chosen per control rather than applied blindly:
+
+   * GROW THE BOX where size is purely cosmetic. Pills and buttons take their
+     height from padding and line-height, so a min-height enlarges only the tap
+     area; nothing around them is sized from these.
+
+   * EXPAND THE HIT AREA where the drawn size is part of the design. The theme
+     switch is the clearest case: its thumb is laid out from --tt-h and
+     --tt-knob, so stretching the pill would drag the knob out of its padding
+     and break the travel distance it animates along. The password eye is a
+     grid container, so a pseudo-element in flow would steal a grid cell from
+     the icon. Both keep their pixels and gain an invisible ::after instead.
+
+   The rule is scoped to (pointer: coarse) so a mouse-driven layout is
+   untouched — this block is a large part of what makes the site feel like an
+   app on a phone rather than a shrunken desktop page.
+
+   An expansion has to stay clear of every other control: a target that
+   overlaps a neighbour is no better than a small one, because the finger
+   resolves to whichever element is on top. Two targets here (.post-card-title
+   and .field-forgot) were moved back into the flow when measurement showed
+   their overhang stealing taps from the row below; see the note beside them.
+   Everything in this section is verified by measuring elementFromPoint hit
+   areas under touch emulation, not by reading the boxes.
+   ========================================================================== */
+
+@media (pointer: coarse) {
+  /* --- Controls that can simply be larger ---------------------------- */
+  .btn,
+  .stat-btn,
+  .lang-btn,
+  .logo,
+  .auth-brand {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* The drawer is where a phone reaches the language and theme switches, so it
+     counts as a touch surface too: its links are set to 42px and its close
+     button to 36px by rules shared with the desktop sidebar. */
+  .drawer-link,
+  .sidenav-link,
+  .drawer-close {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* The logo loses its wordmark at <=640, leaving a 28x28 mark as the whole
+     home link; the anchor has to be the thing that is 44, not just the image. */
+  .logo {
+    justify-content: center;
+  }
+
+  /* Breadcrumbs are 34x15 of text. Growing the row beats an overlapping hit
+     area here: they sit directly under the page title, so expanding past the
+     baseline would put them on top of it. */
+  .breadcrumbs a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    min-width: 44px;
+    padding-inline: 2px;
+  }
+
+  /* --- Invisible hit-area growth ------------------------------------- */
+  .theme-toggle::after,
+  .field-toggle::after,
+  .auth-link::after {
+    content: "";
+    position: absolute;
+    pointer-events: auto;
+  }
+
+  /* 56x30 drawn -> 56x44 touched, centred so the pill stays put. */
+  .theme-toggle::after {
+    inset-inline: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    height: 44px;
+  }
+
+  /* 38x38 drawn -> 44x44 touched. The button is already absolutely
+     positioned, so this costs no layout and no grid cell. */
+  .field-toggle::after {
+    inset: -3px;
+  }
+
+  .auth-link {
+    position: relative;
+  }
+  .auth-link::after {
+    inset: -14px -8px;
+  }
+
+  .field-forgot {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+  }
+
+  /* Two of these started life as ::after expansions and were moved back into
+     the flow after measuring them, because an invisible target is only as big
+     as the pixels nothing else has claimed:
+
+     · .post-card-title sat 6px above the Like/Save row. Its -12px overhang
+       painted on top of .stat-btn (a positioned pseudo-element beats a static
+       box) and pulled that button's measured hit area down to 40px — the fix
+       for one target broke another. Height in flow cannot overlap anything.
+     · .field-forgot sits directly above the password input, whose wrapper is
+       positioned and later in the tree, so it covered the bottom of the
+       overhang and left the link at 40px. */
+  .post-card-title {
+    display: flex;
+    align-items: center;
+    min-height: 44px;
+  }
+}

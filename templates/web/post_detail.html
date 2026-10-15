@@ -67,7 +67,17 @@
       <div class="prompt-box">
         <div class="prompt-box-head">
           <span data-i18n="prompt">{{ i18n.prompt }}</span>
-          <button class="btn btn-ghost btn-sm copy-btn" data-action="copy" data-post-id="{{ post.id }}">{{ i18n.copy }}</button>
+          {% comment %}
+            The single copy affordance on this page: one small icon in the
+            prompt box's top-right corner. The three "Copy the prompt" buttons
+            that used to sit under the actions row are gone — same endpoint,
+            same data-action, no repeated CTA.
+          {% endcomment %}
+          <button class="btn btn-ghost btn-sm copy-btn prompt-copy-btn" data-action="copy"
+                  data-post-id="{{ post.id }}" title="{{ i18n.copy }}"
+                  aria-label="{{ i18n.copy }}">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          </button>
         </div>
         <pre>{{ post.prompt }}</pre>
       </div>
@@ -105,27 +115,13 @@
 
     {% if post.post_type == "image" and post.prompt %}
       {% comment %}Remix is the primary action on an image post: carry the
-      prompt and the post id into the studio so the result links back here.{% endcomment %}
+      prompt and the post id into the studio so the result links back here.
+      Copying lives in the prompt box's corner icon above.{% endcomment %}
       <a class="btn btn-primary btn-use-prompt" href="{% url 'web:studio' %}?source={{ post.id }}"
          title="{{ i18n.studio_use_prompt_title }}">
         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3.5 13.9 9l5.6 1.9-5.6 2L12 18.5l-1.9-5.6L4.5 11 10.1 9z"/><path d="M18.5 3.5v3M20 5h-3"/></svg>
         <span data-i18n="studio_remix">{{ i18n.studio_remix }}</span>
       </a>
-      <button class="btn btn-outline copy-btn" data-action="copy" data-post-id="{{ post.id }}">
-        {{ i18n.copy }} {{ i18n.the_prompt }}
-      </button>
-    {% elif post.video or post.image %}
-      {% if post.prompt %}
-        <button class="btn btn-outline copy-btn" data-action="copy" data-post-id="{{ post.id }}">
-          {{ i18n.copy }} {{ i18n.the_prompt }}
-        </button>
-      {% endif %}
-    {% else %}
-      {% if post.prompt %}
-        <button class="btn btn-primary btn-copy-cta copy-btn" data-action="copy" data-post-id="{{ post.id }}">
-          {{ i18n.copy }} {{ i18n.the_prompt }}
-        </button>
-      {% endif %}
     {% endif %}
 
     {% comment %}

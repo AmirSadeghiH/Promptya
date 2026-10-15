@@ -146,3 +146,38 @@ def mark_noindex(response, directives="noindex, follow"):
     """Set ``X-Robots-Tag`` on an already-rendered response (conditional pages)."""
     response.headers["X-Robots-Tag"] = directives
     return response
+
+
+class CsrfCookieOnEveryPageMiddleware:
+    """Set the csrftoken cookie on every response, even for pages with no forms.
+
+    Django only sets the csrftoken cookie when ``{% csrf_token %}`` renders a
+    hidden input field in a form. Pages like the home page and feed that use the
+    token only in a ``<meta>`` tag for JavaScript do not trigger this, so
+    signed-out users tapping Like/Save get 403 (CSRF error) instead of 401
+    (auth required).
+
+    This middleware calls ``django.middleware.csrf.rotate_token()`` on every
+    response, which sets the csrftoken cookie if it is not already set. The
+    token value itself comes from the template via ``{{ csrf_token }}``, so this
+    middleware does not change the token — it only ensures the cookie is set so
+    browsers can send it back with AJAX requests.
+
+    Must run after Django's ``CsrfViewMiddleware``.
+    """
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        response = self.get_response(request)
+        # Ensure the csrftoken cookie is set on this response. Django only sets
+        # the cookie when {% csrf_token %} renders a hidden input in a form, so
+        # pages that use the token only in a <meta> tag (via the base.html change)
+        # would not set the cookie without this middleware. rotate_token() primes
+        # the token in the request and sets the cookie on the response if it is
+        # not already present.
+        from django.middleware.csrf import get_token
+        get_token(request)
+        response.headers.setdefault("Set-Cookie", "")
+        return response

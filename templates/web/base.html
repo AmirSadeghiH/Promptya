@@ -24,6 +24,34 @@
   {% endcomment %}
   <title>{% block title %}{{ seo_title|default:"Promptya — free AI prompts to share, browse and remix" }}{% endblock %}</title>
   <meta name="description" content="{% block description %}{{ seo_description|default:"Browse, save and remix AI image, video and audio results, and read the exact prompt behind every one." }}{% endblock %}">
+
+  {% comment %}
+    The four client-side scripts that talk to state-changing API endpoints (Like, Save,
+    Create, Studio, profile update, comment post) need a CSRF token from the very first
+    page the reader lands on, not only from auth forms. Django only sets the `csrftoken`
+    cookie when a template renders a csrf_token tag, and `base.html` never used to — that
+    is why every POST a new visitor made on `/` or the feed was rejected at the CSRF
+    layer (403) before it ever reached the auth check (401).
+
+    The token is here as a `<meta>` in the head (it is not tied to any form, so it can
+    live in `base.html` rather than on each template individually), and the four readers
+    prefer it and fall back to the cookie, so a reader who started on an auth page and
+    then moved to a feed still has the token the cookie is wearing.
+
+    `django.middleware.csrf.get_token(request)` is idempotent and cheap for a page with no
+    forms — it primes the backend's token store and returns the token string. The
+    middleware will set the `csrftoken` cookie on any page that *renders* the value
+    somewhere (form field *or* `<meta>`), so this single tag is what makes every page
+    a valid first page for a state-changing interaction.
+
+    (This used to be a `{# … #}` inline comment, but Django's inline comments are
+    single-line only — the block silently rendered as visible page text and even
+    executed the csrf_token tag written inside it. {% comment %} blocks are the
+    multi-line form.)
+  {% endcomment %}
+  {% load tz %}
+  {% csrf_token %}
+  <meta id="csrf-meta" name="csrf-token" content="{{ csrf_token }}">
   {% block robots %}<meta name="robots" content="{{ robots_meta|default:'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1' }}">{% endblock %}
   {% block canonical %}<link rel="canonical" href="{{ canonical_url|default:request.build_absolute_uri }}">{% endblock %}
   {# Language alternates. Reciprocal by construction: every version of a page is built from the same neutral path and emits the same set. #}

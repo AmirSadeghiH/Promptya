@@ -82,12 +82,17 @@ def serialize_user(user, *, viewer=None, detailed=False):
     if detailed:
         follower_count = Follow.objects.filter(following=user).count()
         following_count = Follow.objects.filter(follower=user).count()
+        # `profile_detail` annotates post_count; reuse it instead of running a
+        # second COUNT against the same table.
+        post_count = getattr(user, "post_count", None)
+        if post_count is None:
+            post_count = user.posts.count()
         data.update(
             {
                 "biography": user.biography,
                 "level": user.level,
                 "experience": user.experience,
-                "post_count": user.posts.count(),
+                "post_count": post_count,
                 "follower_count": follower_count,
                 "following_count": following_count,
             }
@@ -323,21 +328,22 @@ def saved_posts(request):
     if request.method != "GET":
         return _method_not_allowed()
 
-    save_rows = list(
+    # Ids only — the post rows themselves come from post_list_queryset,
+    # which attaches the engagement counts and viewer flags the serializer
+    # needs. select_related("post") would load every post twice.
+    saved_ids = list(
         Save.objects.filter(user=request.user)
-        .select_related("post")
         .order_by("-created_at", "-pk")
+        .values_list("post_id", flat=True)
     )
-    if not save_rows:
+    if not saved_ids:
         return JsonResponse({"results": []})
 
     posts = {
         post.pk: post
-        for post in post_list_queryset(request.user).filter(
-            pk__in=[row.post_id for row in save_rows]
-        )
+        for post in post_list_queryset(request.user).filter(pk__in=saved_ids)
     }
-    ordered = [posts[row.post_id] for row in save_rows if row.post_id in posts]
+    ordered = [posts[post_id] for post_id in saved_ids if post_id in posts]
     return JsonResponse(
         {"results": [serialize_post(post, viewer=request.user) for post in ordered]}
     )

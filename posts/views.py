@@ -7,6 +7,7 @@ from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from django.views.decorators.http import require_POST
 
+from imagegen.models import AIModel
 from posts.models import Category, Post, Tag
 from posts.recommendations import get_recommended_feed
 from posts.validation import validate_post_media
@@ -258,11 +259,37 @@ def _validate_media_for_type(post_type, media):
     return None
 
 
+def _clean_ai_model(raw):
+    """Normalize a submitted model name against the admin-configured list.
+
+    Returns the canonical spelling, ``""`` for “no model”, or ``None`` when
+    the value names a model that is not on the active list.  With no list
+    configured at all (fresh install, nobody visited the admin yet) any value
+    is accepted, so the API is never bricked by missing configuration.
+    """
+    name = str(raw or "").strip()
+    if not name:
+        return ""
+    active = AIModel.active_names()
+    if not active:
+        return name
+    for option in active:
+        if option.casefold() == name.casefold():
+            return option
+    return None
+
+
 def _validate_post_payload(data, *, partial=False):
     errors = {}
     post_type = data.get("post_type")
     title = data.get("title")
     category_id = data.get("category_id")
+
+    ai_model = None
+    if (not partial or "ai_model" in data) and (data.get("ai_model") or "").strip():
+        ai_model = _clean_ai_model(data.get("ai_model"))
+        if ai_model is None:
+            errors["ai_model"] = "Choose an AI model from the list."
 
     if not partial or "post_type" in data:
         if post_type not in Post.PostType.values:
@@ -290,14 +317,14 @@ def _validate_post_payload(data, *, partial=False):
         if "prompt" in data:
             payload["prompt"] = str(data["prompt"]).strip()
         if "ai_model" in data:
-            payload["ai_model"] = str(data["ai_model"]).strip()
+            payload["ai_model"] = ai_model if ai_model is not None else ""
     else:
         payload = {
             "post_type": post_type,
             "title": title.strip(),
             "description": str(data.get("description") or "").strip(),
             "prompt": str(data.get("prompt") or "").strip(),
-            "ai_model": str(data.get("ai_model") or "").strip(),
+            "ai_model": ai_model if ai_model is not None else "",
         }
     return payload, None
 

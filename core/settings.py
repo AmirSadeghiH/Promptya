@@ -93,6 +93,13 @@ MIDDLEWARE = [
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
+    # Ensures the csrftoken cookie is set on every response, not only on pages
+    # that render a form. Without this, pages like /en/ and the feed that use the
+    # token only in a <meta> tag for JavaScript do not set the cookie, so signed-out
+    # users tapping Like/Save get 403 (CSRF error) before ever reaching the auth check
+    # (401). The meta tag in base.html gives JavaScript the token value; this middleware
+    # makes sure the browser actually receives the cookie so it can send the token back.
+    'web.middleware.CsrfCookieOnEveryPageMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',

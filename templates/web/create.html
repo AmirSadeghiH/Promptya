@@ -34,7 +34,14 @@
 
   <label class="field">
     <span data-i18n="ai_model">{{ i18n.ai_model }} <small data-i18n="optional">{{ i18n.optional }}</small></span>
-    <input type="text" name="ai_model" maxlength="100" placeholder="{{ i18n.ai_model_placeholder }}">
+    <!-- A select, not a text box: the options are the rows admins maintain
+         under Admin → AI models, so posts carry consistent model names. -->
+    <select name="ai_model">
+      <option value="" data-i18n="choose_model">{{ i18n.choose_model }}</option>
+      {% for model in model_options %}
+        <option value="{{ model.name }}" dir="auto">{{ model.name }}</option>
+      {% endfor %}
+    </select>
   </label>
 
   <!-- Text content preview: the prompt itself is the media for a text post,

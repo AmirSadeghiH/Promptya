@@ -6,6 +6,7 @@ from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.test import Client, RequestFactory, TestCase, override_settings
 from django.urls import reverse
+from posts import models as posts_models
 
 from core.ratelimit import get_client_ip
 
@@ -180,3 +181,19 @@ class StateChangingEndpointCsrfTests(TestCase):
         url = reverse("posts:post-create")
         payload = {"title": "A prompt", "post_type": "prompt", "prompt": "A quiet harbour at dawn"}
         self.assertEqual(self._json(url, payload).status_code, 403)
+
+    def test_toggle_like_requires_a_csrf_token(self):
+        """``POST /api/posts/<id>/like/`` must reject a request with no CSRF token"""
+        self.client.force_login(self.user)
+        category = posts_models.Category.objects.create(name="Art", slug="art")
+        post = posts_models.Post.objects.create(
+            author=self.user,
+            category=category,
+            title="CSRF test post",
+            prompt="A quiet harbour at dawn",
+            post_type="prompt",
+        )
+        url = reverse("interactions:toggle-like", args=[post.id])
+        self.assertEqual(self._json(url, {}).status_code, 403)
+        self.assertNotEqual(self._json(url, {}, self._token()).status_code, 403)
+

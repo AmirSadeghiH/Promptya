@@ -65,7 +65,20 @@
     setTimeout(function () { box.classList.remove("show"); }, 2200);
   }
 
+  /* Read any cookie by name, with the same caveat the rest of the app carries:
+     a reader may land on a page that never rendered a form, so the relevant cookie
+     (csrftoken) may not exist yet. That function is used for CSRF by the caller, so
+     it falls back to the `<meta id="csrf-meta">` in the head, which every page
+     sets.
+     
+     The page always sets that meta, which is emitted from the same heading the page
+     uses for its title and canonical — a single place that is on every page the
+     reader can start on. */
   function getCookie(name) {
+    if (name === "csrftoken") {
+      var meta = document.getElementById("csrf-meta");
+      if (meta) return meta.content;
+    }
     var row = document.cookie.split("; ").find(function (part) {
       return part.indexOf(name + "=") === 0;
     });

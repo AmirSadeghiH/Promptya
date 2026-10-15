@@ -13,6 +13,7 @@ import re
 from datetime import timedelta
 
 from django.db import IntegrityError, models, transaction
+from django.db.models import Count
 from django.utils import timezone
 
 from credits.models import Challenge, ChallengeCompletion, ChallengeType
@@ -199,6 +200,24 @@ def challenge_state(user) -> list[dict]:
     for row in verified:
         counts[row["challenge_id"]] = counts.get(row["challenge_id"], 0) + 1
 
+    # One aggregate for every challenge that has a global cap, instead of one
+    # COUNT per challenge inside the loop below.
+    capped_ids = set()
+    if any(challenge.max_total_rewards for challenge in challenges):
+        global_rows = (
+            ChallengeCompletion.objects.filter(
+                challenge__in=challenges,
+                status=ChallengeCompletion.Status.VERIFIED,
+                challenge__max_total_rewards__gt=0,
+            )
+            .values("challenge_id")
+            .annotate(n=Count("id"))
+        )
+        cap_by_id = {ch.id: ch.max_total_rewards for ch in challenges if ch.max_total_rewards}
+        for row in global_rows:
+            if row["n"] >= cap_by_id[row["challenge_id"]]:
+                capped_ids.add(row["challenge_id"])
+
     state = []
     for challenge in challenges:
         earned = counts.get(challenge.id, 0)
@@ -207,8 +226,8 @@ def challenge_state(user) -> list[dict]:
         # Check if challenge is currently open (time window)
         is_open = challenge.is_open(now)
         
-        # Check global cap
-        global_capped = not challenge.can_claim_globally()
+        # Check global cap (precomputed above; == not challenge.can_claim_globally())
+        global_capped = challenge.id in capped_ids
         
         state.append(
             {
