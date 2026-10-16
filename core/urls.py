@@ -26,6 +26,7 @@ urlpatterns = [
     path('api/', include('imagegen.urls')),
     path('api/', include('credits.urls')),
     path('api/', include('notifications.urls')),
+    path('api/', include('moderation.urls')),
 
     # --- Auth: one address each, so the PWA and shared links stay stable ----
     path('login/', auth_views.login_page, name='login'),

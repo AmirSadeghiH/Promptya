@@ -44,6 +44,14 @@ class AuditLog(models.Model):
         # Configuration
         AI_CONFIG_CHANGE = "ai_config_change", "AI config changed"
 
+        # Moderation
+        REPORT_RESOLVE = "report_resolve", "Report resolved with action"
+        REPORT_DISMISS = "report_dismiss", "Report dismissed"
+        USER_RESTRICT = "user_restrict", "User restricted"
+        USER_SUSPEND = "user_suspend", "User suspended"
+        USER_BAN = "user_ban", "User banned"
+        USER_UNRESTRICT = "user_unrestrict", "User restriction lifted"
+
     actor = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -100,6 +108,15 @@ class AuditLog(models.Model):
         help_text="Challenge completion affected by the action (if applicable)",
     )
 
+    target_report = models.ForeignKey(
+        "moderation.Report",
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name="audit_logs",
+        help_text="Report affected by the action (if applicable)",
+    )
+
     metadata = models.JSONField(
         default=dict,
         blank=True,
@@ -138,6 +155,8 @@ class AuditLog(models.Model):
             target = f" -> Post({self.target_post.pk})"
         elif self.target_comment:
             target = f" -> Comment({self.target_comment.pk})"
+        elif self.target_report:
+            target = f" -> Report({self.target_report.pk})"
         return f"{actor}: {self.action}{target}"
 
 
@@ -150,6 +169,7 @@ def log_admin_action(
     target_comment=None,
     target_challenge=None,
     target_completion=None,
+    target_report=None,
     metadata=None,
 ):
     """Convenience function to create an audit log entry from an admin request."""
@@ -172,6 +192,7 @@ def log_admin_action(
         target_comment=target_comment,
         target_challenge=target_challenge,
         target_completion=target_completion,
+        target_report=target_report,
         metadata=metadata or {},
         ip_address=ip,
         user_agent=request.META.get("HTTP_USER_AGENT", "") if request else "",

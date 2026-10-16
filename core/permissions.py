@@ -39,6 +39,11 @@ ADMIN_PERMISSIONS = [
     # Credit operations
     ("can_adjust_credits", "Can adjust user credits via admin"),
 
+    # Moderation
+    ("can_review_reports", "Can review the moderation report queue"),
+    ("can_action_reports", "Can action or dismiss reports"),
+    ("can_moderate_users", "Can restrict, suspend or ban users"),
+
     # Configuration
     ("can_change_ai_config", "Can change AI provider configuration"),
 
@@ -66,6 +71,8 @@ ADMIN_GROUPS = {
         "can_soft_delete_posts",
         "can_hide_comments",
         "can_unhide_comments",
+        "can_review_reports",
+        "can_action_reports",
     ],
     "community_managers": [
         "can_activate_users",
@@ -76,6 +83,9 @@ ADMIN_GROUPS = {
         "can_unhide_posts",
         "can_hide_comments",
         "can_unhide_comments",
+        "can_review_reports",
+        "can_action_reports",
+        "can_moderate_users",
     ],
     "operations": [
         "can_activate_users",

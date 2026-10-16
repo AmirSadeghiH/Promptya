@@ -24,6 +24,7 @@ from imagegen.services import (
     recent_generations,
 )
 from interactions.models import Follow, Save
+from moderation.services import viewer_has_blocked
 from notifications.models import Notification
 from notifications.services import serialize_notification, unread_count
 from posts.models import Category, Post, Tag
@@ -762,6 +763,7 @@ def profile_page(request, username):
         "is_following": bool(
             viewer and Follow.objects.filter(follower=viewer, following=user).exists()
         ),
+        "is_blocked": bool(viewer and viewer_has_blocked(viewer, user)),
         "has_next_page": has_next,
         "next_page": next_page,
         "page_query": _page_query(page.number) if page.number > 1 else "",

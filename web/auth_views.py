@@ -133,10 +133,13 @@ def login_page(request):
             username__iexact=identifier
         ).first() or User.objects.filter(email__iexact=identifier).first()
         user = authenticate(request, username=found.username, password=password) if found else None
-        if user:
+        if user and user.is_banned:
+            error = "This account has been disabled."
+        elif user:
             login(request, user)
             return redirect("web:home")
-        error = "Invalid username or password."
+        else:
+            error = "Invalid username or password."
 
     return render(request, "web/login_new.html", _auth_context({"error": error}))
 

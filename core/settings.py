@@ -76,6 +76,7 @@ INSTALLED_APPS = [
     'imagegen',
     'interactions',
     'notifications',
+    'moderation',
     'web',
 ]
 
@@ -101,6 +102,9 @@ MIDDLEWARE = [
     # makes sure the browser actually receives the cookie so it can send the token back.
     'web.middleware.CsrfCookieOnEveryPageMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    # Refuses state-changing /api/ calls from restricted, suspended or banned
+    # accounts. Runs after authentication so request.user is resolved.
+    'moderation.middleware.ModerationRestrictionMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
