@@ -26,6 +26,10 @@
       ?.split("=")[1];
   })();
 
+  /* The reader's own username, when signed in. Used to decide whether a UGC
+     control (delete a comment, report a comment) belongs on a rendered item. */
+  const CURRENT_USER = window.PROMPTYA_USER || "";
+
   /* Resolve a fetch response the way every caller here expects: the parsed
      body on success, and on failure the parsed body *plus* the HTTP status.
 
@@ -142,6 +146,37 @@
         .catch(() => toast(t("follow_error")));
     }
 
+    if (action === "block") {
+      e.preventDefault();
+      const username = btn.dataset.username;
+      const blocked = btn.classList.contains("is-active");
+      fetch(`/api/blocks/${encodeURIComponent(username)}/`, {
+        method: blocked ? "DELETE" : "POST",
+        headers: { "X-CSRFToken": CSRF },
+        credentials: "same-origin",
+      })
+        .then(settle)
+        .then((data) => {
+          /* Blocking changes what the feed and profile may show, so the page
+             is reloaded rather than patched: the posts of a blocked creator
+             have to disappear from wherever the reader happens to be. */
+          toast(data.blocked ? t("block_toast") : t("unblock_toast"));
+          window.location.reload();
+        })
+        .catch((err) => {
+          if (err && err.status === 401) toast(t("login_to_do_that"));
+          else toast(t("block_error"));
+        });
+    }
+
+    if (action === "report") {
+      e.preventDefault();
+      openReport({
+        target_type: btn.dataset.targetType,
+        target_id: parseInt(btn.dataset.targetId, 10),
+      });
+    }
+
     if (action === "copy") {
       e.preventDefault();
       const pre = document.querySelector(".prompt-box pre");
@@ -224,14 +259,18 @@
       row.appendChild(buildAvatar(c.user, "comment-avatar comment-avatar-fallback"));
       const main = document.createElement("div");
       main.className = "comment-main";
+      const isOwn = c.user.username === CURRENT_USER;
       main.innerHTML =
         '<div class="comment-head"><span class="creator-name">@' +
         escapeHtml(c.user.username) +
         "</span><span>" +
         '<span class="comment-time">' + new Date(c.created_at).toLocaleString(PromptyaI18n.dateLocale()) + "</span>" +
-        (window.IS_OWNER
+        (isOwn
           ? ' <button class="comment-delete" data-comment-id="' + c.id + '">' + t("delete") + '</button>'
-          : "") +
+          : CURRENT_USER
+            ? ' <button class="comment-report" data-action="report" data-target-type="comment" data-target-id="' +
+              c.id + '" aria-label="' + t("report") + '">' + t("report") + '</button>'
+            : "") +
         "</span></div><p>" +
         escapeHtml(c.content) +
         "</p>";
@@ -563,6 +602,67 @@
       article.appendChild(body);
       return article;
     }
+  }
+
+  /* ---------------- Report modal ---------------- */
+  /* One dialog, many entry points: a post, a profile or a comment only set the
+     target, and this submits it. Reporting requires an account, so the markup
+     is only rendered for a signed-in reader — openReport bails out otherwise. */
+  const reportModal = document.getElementById("report-modal");
+  const reportForm = document.getElementById("report-form");
+  let reportTarget = null;
+
+  function openReport(target) {
+    if (!reportModal || !target || !target.target_id) {
+      if (!CURRENT_USER) toast(t("login_to_do_that"));
+      return;
+    }
+    reportTarget = target;
+    reportForm.reset();
+    reportModal.hidden = false;
+    document.body.classList.add("modal-open");
+    const first = reportForm.querySelector("select");
+    if (first) first.focus();
+  }
+
+  function closeReport() {
+    if (!reportModal) return;
+    reportModal.hidden = true;
+    document.body.classList.remove("modal-open");
+    reportTarget = null;
+  }
+
+  if (reportModal) {
+    reportModal.querySelectorAll("[data-report-close]").forEach((el) =>
+      el.addEventListener("click", closeReport)
+    );
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && !reportModal.hidden) closeReport();
+    });
+    reportForm.addEventListener("submit", function (e) {
+      e.preventDefault();
+      if (!reportTarget) return;
+      const submit = document.getElementById("report-submit");
+      if (submit) submit.disabled = true;
+      post("/api/reports/", {
+        target_type: reportTarget.target_type,
+        target_id: reportTarget.target_id,
+        reason: reportForm.querySelector("#report-reason").value,
+        details: reportForm.querySelector("#report-details").value,
+      })
+        .then(() => {
+          closeReport();
+          toast(t("report_thanks"));
+        })
+        .catch((err) => {
+          if (err && err.error_code === "already_reported") toast(t("report_duplicate"));
+          else if (err && err.status === 401) toast(t("login_to_do_that"));
+          else toast(t("report_error"));
+        })
+        .finally(() => {
+          if (submit) submit.disabled = false;
+        });
+    });
   }
 
   /* ---------------- Keyboard shortcut ---------------- */
