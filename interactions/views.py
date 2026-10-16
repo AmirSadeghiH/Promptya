@@ -11,6 +11,8 @@ from django.views.decorators.http import require_POST
 
 from core.ratelimit import rate_limit_user, rate_limit_ip
 from interactions.models import Comment, Follow, Like, PostCopy, PostView, Save
+from moderation.antispam import looks_like_spam
+from moderation.services import blocked_user_ids, is_blocked_between
 from posts.models import Post
 from posts.services import post_list_queryset, serialize_post
 
@@ -100,6 +102,12 @@ def create_comment(request, post_id):
     if error_response:
         return error_response
 
+    # A block is symmetric: neither party may comment on the other's post.
+    if is_blocked_between(request.user, post.author):
+        return JsonResponse(
+            {"error": "You cannot comment on this post."}, status=403
+        )
+
     try:
         data = json.loads(request.body.decode("utf-8")) if request.body else {}
     except (ValueError, UnicodeDecodeError):
@@ -111,6 +119,19 @@ def create_comment(request, post_id):
     if len(content) > 2000:
         return JsonResponse(
             {"errors": {"content": "Comment must be at most 2000 characters."}},
+            status=400,
+        )
+
+    # Anti-spam rejects only this submission — never the account. A false
+    # positive costs one retyped comment, not a ban.
+    previous = list(
+        Comment.objects.filter(user=request.user, post=post)
+        .order_by("-created_at")
+        .values_list("content", flat=True)[:5]
+    )
+    if looks_like_spam(content, previous_contents=previous):
+        return JsonResponse(
+            {"errors": {"content": "This looks like spam. Please rewrite your comment."}},
             status=400,
         )
 
@@ -160,8 +181,15 @@ def list_comments(request, post_id):
         return error_response
 
     comments = (
-        post.comments.select_related("user").order_by("created_at")
+        post.comments.filter(is_hidden=False)
+        .select_related("user")
+        .order_by("created_at")
     )
+    viewer = request.user if request.user.is_authenticated else None
+    if viewer is not None:
+        blocked_ids = blocked_user_ids(viewer)
+        if blocked_ids:
+            comments = comments.exclude(user_id__in=blocked_ids)
     return JsonResponse(
         {
             "results": [
@@ -195,6 +223,9 @@ def toggle_follow(request, username):
         get_user_model().objects.exclude(pk=request.user.pk),
         username=username,
     )
+
+    if is_blocked_between(request.user, target):
+        return JsonResponse({"error": "You cannot follow this user."}, status=403)
 
     follow, created = Follow.objects.get_or_create(follower=request.user, following=target)
     if not created:
