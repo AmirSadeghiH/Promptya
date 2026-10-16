@@ -17,6 +17,12 @@ def _default_code_expiry():
 
 
 class CustomUser(AbstractUser):
+    class ModerationStatus(models.TextChoices):
+        ACTIVE = "active", "Active"
+        RESTRICTED = "restricted", "Restricted"
+        SUSPENDED = "suspended", "Suspended"
+        BANNED = "banned", "Banned"
+
     display_name = models.CharField(
         max_length=100,
         blank=True
@@ -74,8 +80,53 @@ class CustomUser(AbstractUser):
         auto_now=True
     )
 
+    # -- Moderation state ---------------------------------------------------
+    # ``is_active`` stays Django's authentication gate.  These fields describe a
+    # *trust* decision that is independent of whether the account can log in:
+    # a suspended user may still sign in and browse, but cannot act.
+    moderation_status = models.CharField(
+        max_length=20,
+        choices=ModerationStatus.choices,
+        default=ModerationStatus.ACTIVE,
+        help_text="Account trust level. Managed by moderators, never by the user.",
+    )
+
+    moderation_reason = models.TextField(
+        blank=True,
+        default="",
+        help_text="Internal note explaining the current moderation state.",
+    )
+
+    moderation_until = models.DateTimeField(
+        blank=True,
+        null=True,
+        help_text="When a suspension ends. Null means indefinite.",
+    )
+
     def __str__(self):
         return self.username
+
+    @property
+    def is_banned(self):
+        return self.moderation_status == self.ModerationStatus.BANNED
+
+    @property
+    def is_restricted(self):
+        return self.moderation_status == self.ModerationStatus.RESTRICTED
+
+    @property
+    def is_suspended(self):
+        """True while a suspension is in force (an expired one lapses by itself)."""
+        if self.moderation_status != self.ModerationStatus.SUSPENDED:
+            return False
+        if self.moderation_until is None:
+            return True
+        return timezone.now() < self.moderation_until
+
+    @property
+    def has_active_restriction(self):
+        """Whether non-mutating actions must be refused for this account."""
+        return self.is_banned or self.is_restricted or self.is_suspended
 
     @property
     def display_label(self):

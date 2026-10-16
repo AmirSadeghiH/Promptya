@@ -111,6 +111,13 @@
       </button>
       <span class="stat-pill">{{ post.copy_count }} {{ i18n.copies }}</span>
       <span class="stat-pill">{{ post.comment_count }} {{ i18n.comments }}</span>
+      {% if user.is_authenticated and user.username != post.author.username %}
+        <button class="stat-btn report-btn" data-action="report"
+                data-target-type="post" data-target-id="{{ post.id }}"
+                aria-label="{{ i18n.report }}" title="{{ i18n.report }}">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 21V4"/><path d="M4 4h13l-2 4 2 4H4"/></svg>
+        </button>
+      {% endif %}
     </div>
 
     {% if post.post_type == "image" and post.prompt %}

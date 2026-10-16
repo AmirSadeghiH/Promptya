@@ -1,6 +1,7 @@
 from django.contrib import admin, messages
 from django.contrib.auth.admin import UserAdmin
 from django.db.models import Count
+from django.utils import timezone
 
 from account.models import CustomUser, EmailVerificationToken
 from core.models import AuditLog, log_admin_action
@@ -35,6 +36,7 @@ class CustomUserAdmin(UserAdmin):
         "email",
         "display_name",
         "is_verified",
+        "moderation_status",
         "is_active",
         "is_staff",
         "credit_balance",
@@ -42,17 +44,39 @@ class CustomUserAdmin(UserAdmin):
         "experience",
         "created_at",
     )
-    list_filter = ("is_verified", "is_staff", "is_active", "is_superuser")
+    list_filter = ("is_verified", "is_staff", "is_active", "is_superuser", "moderation_status")
     search_fields = ("username", "email", "display_name")
     list_editable = ("is_verified", "is_active", "is_staff")
     fieldsets = UserAdmin.fieldsets + (
         ("Profile", {"fields": ("display_name", "biography", "profile_picture", "is_verified")}),
         ("Gamification", {"fields": ("level", "experience")}),
         ("Credits", {"fields": ("credit_balance", "referred_by")}),
+        ("Moderation", {"fields": ("moderation_status", "moderation_reason", "moderation_until")}),
         ("Timestamps", {"fields": ("created_at", "updated_at")}),
     )
-    readonly_fields = ("created_at", "updated_at", "last_login", "date_joined", "credit_balance", "referred_by")
-    actions = ("activate_users", "deactivate_users", "verify_emails", "unverify_emails", "grant_credits", "revoke_credits")
+    readonly_fields = (
+        "created_at",
+        "updated_at",
+        "last_login",
+        "date_joined",
+        "credit_balance",
+        "referred_by",
+        "moderation_status",
+        "moderation_reason",
+        "moderation_until",
+    )
+    actions = (
+        "activate_users",
+        "deactivate_users",
+        "verify_emails",
+        "unverify_emails",
+        "grant_credits",
+        "revoke_credits",
+        "restrict_users",
+        "suspend_users",
+        "ban_users",
+        "lift_restrictions",
+    )
 
     def _check_perm(self, request, perm):
         if not request.user.has_perm(f"core.{perm}"):
@@ -121,6 +145,61 @@ class CustomUserAdmin(UserAdmin):
             adjust(user, -100, note=f"Admin revoke by {request.user}")
             log_admin_action(request, AuditLog.Action.USER_REVOKE_CREDITS, target_user=user, metadata={"amount": -100})
         self.message_user(request, f"Revoked up to 100 credits from {len(users)} user(s).", messages.SUCCESS)
+
+    @admin.action(description="Restrict selected users (can browse, cannot act)")
+    def restrict_users(self, request, queryset):
+        if not self._check_perm(request, "can_moderate_users"):
+            return
+        queryset = queryset.exclude(pk=request.user.pk)
+        for user in queryset:
+            user.moderation_status = CustomUser.ModerationStatus.RESTRICTED
+            user.moderation_until = None
+            user.save(update_fields=["moderation_status", "moderation_until", "updated_at"])
+            log_admin_action(request, AuditLog.Action.USER_RESTRICT, target_user=user)
+        self.message_user(request, f"Restricted {queryset.count()} user(s).", messages.SUCCESS)
+
+    @admin.action(description="Suspend selected users for 7 days")
+    def suspend_users(self, request, queryset):
+        if not self._check_perm(request, "can_moderate_users"):
+            return
+        queryset = queryset.exclude(pk=request.user.pk)
+        until = timezone.now() + timezone.timedelta(days=7)
+        for user in queryset:
+            user.moderation_status = CustomUser.ModerationStatus.SUSPENDED
+            user.moderation_until = until
+            user.save(update_fields=["moderation_status", "moderation_until", "updated_at"])
+            log_admin_action(
+                request,
+                AuditLog.Action.USER_SUSPEND,
+                target_user=user,
+                metadata={"until": until.isoformat()},
+            )
+        self.message_user(request, f"Suspended {queryset.count()} user(s) for 7 days.", messages.SUCCESS)
+
+    @admin.action(description="Ban selected users")
+    def ban_users(self, request, queryset):
+        if not self._check_perm(request, "can_moderate_users"):
+            return
+        queryset = queryset.exclude(pk=request.user.pk)
+        for user in queryset:
+            user.moderation_status = CustomUser.ModerationStatus.BANNED
+            user.moderation_until = None
+            user.is_active = False
+            user.save(update_fields=["moderation_status", "moderation_until", "is_active", "updated_at"])
+            log_admin_action(request, AuditLog.Action.USER_BAN, target_user=user)
+        self.message_user(request, f"Banned {queryset.count()} user(s).", messages.SUCCESS)
+
+    @admin.action(description="Lift moderation restrictions")
+    def lift_restrictions(self, request, queryset):
+        if not self._check_perm(request, "can_moderate_users"):
+            return
+        for user in queryset:
+            user.moderation_status = CustomUser.ModerationStatus.ACTIVE
+            user.moderation_until = None
+            user.is_active = True
+            user.save(update_fields=["moderation_status", "moderation_until", "is_active", "updated_at"])
+            log_admin_action(request, AuditLog.Action.USER_UNRESTRICT, target_user=user)
+        self.message_user(request, f"Lifted restrictions for {queryset.count()} user(s).", messages.SUCCESS)
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)

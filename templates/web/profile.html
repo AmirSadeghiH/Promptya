@@ -27,12 +27,26 @@
     </div>
   </div>
   {% if user.is_authenticated and user.username != profile_user.username %}
-    <button class="btn btn-outline follow-btn {% if is_following %}is-active{% endif %}"
-            data-action="follow" data-username="{{ profile_user.username }}">
-      {% if is_following %}{{ i18n.following_btn }}{% else %}{{ i18n.follow }}{% endif %}
-    </button>
+    <div class="profile-actions">
+      <button class="btn btn-outline follow-btn {% if is_following %}is-active{% endif %}"
+              data-action="follow" data-username="{{ profile_user.username }}">
+        {% if is_following %}{{ i18n.following_btn }}{% else %}{{ i18n.follow }}{% endif %}
+      </button>
+      {%if is_superuser %}<button class="btn btn-outline block-btn {% if is_blocked %}is-active{% endif %}"
+              data-action="block" data-username="{{ profile_user.username }}">
+        <span data-block-label>{% if is_blocked %}{{ i18n.unblock }}{% else %}{{ i18n.block }}{% endif %}</span>
+      </button>{% endif %}
+      <button class="btn btn-ghost report-btn" data-action="report"
+              data-target-type="user" data-target-id="{{ profile_user.id }}"
+              aria-label="{{ i18n.report }}" title="{{ i18n.report }}">
+        <span data-i18n="report">{{ i18n.report }}</span>
+      </button>
+    </div>
   {% endif %}
 </section>
+{% if is_blocked %}
+  <p class="muted blocked-note">{{ i18n.blocked_note }}</p>
+{% endif %}
 
 {% comment %}
   A creator with no public posts still gets a real page (they are linked from

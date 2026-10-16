@@ -182,6 +182,9 @@ def api_login(request):
     if user is None:
         return JsonResponse({"error": "Invalid credentials."}, status=400)
 
+    if user.is_banned:
+        return JsonResponse({"error": "This account has been disabled."}, status=403)
+
     login(request, user)
     return JsonResponse({"user": serialize_user(user, detailed=True)})
 

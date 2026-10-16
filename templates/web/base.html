@@ -450,7 +450,44 @@
 {% endif %}
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <script>window.PROMPTYA_LANG = "{{ lang }}";</script>
+
+  {% comment %}
+    One report dialog for the whole site. Every [data-action="report"] control
+    (post detail, profile, each comment) only carries the target it points at;
+    the reason list, the field labels and the submit call live here once, so the
+    wording cannot drift between the three entry points. Rendered only for a
+    signed-in reader — reporting requires an account.
+  {% endcomment %}
+  {% if not standalone and user.is_authenticated %}
+  <div id="report-modal" class="modal" hidden>
+    <div class="modal-scrim" data-report-close></div>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="report-modal-title">
+      <h2 class="modal-title" id="report-modal-title" data-i18n="report_title">{{ i18n.report_title }}</h2>
+      <form id="report-form">
+        <label class="modal-label" for="report-reason" data-i18n="report_reason_label">{{ i18n.report_reason_label }}</label>
+        <select id="report-reason" name="reason" required>
+          <option value="spam" data-i18n="report_reason_spam">{{ i18n.report_reason_spam }}</option>
+          <option value="harassment" data-i18n="report_reason_harassment">{{ i18n.report_reason_harassment }}</option>
+          <option value="hate" data-i18n="report_reason_hate">{{ i18n.report_reason_hate }}</option>
+          <option value="nudity" data-i18n="report_reason_nudity">{{ i18n.report_reason_nudity }}</option>
+          <option value="violence" data-i18n="report_reason_violence">{{ i18n.report_reason_violence }}</option>
+          <option value="misinformation" data-i18n="report_reason_misinformation">{{ i18n.report_reason_misinformation }}</option>
+          <option value="copyright" data-i18n="report_reason_copyright">{{ i18n.report_reason_copyright }}</option>
+          <option value="other" data-i18n="report_reason_other">{{ i18n.report_reason_other }}</option>
+        </select>
+        <label class="modal-label" for="report-details" data-i18n="report_details_label">{{ i18n.report_details_label }}</label>
+        <textarea id="report-details" name="details" rows="3" maxlength="1000"
+                  placeholder="{{ i18n.report_details_placeholder }}"></textarea>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-ghost" data-report-close data-i18n="report_cancel">{{ i18n.report_cancel }}</button>
+          <button type="submit" class="btn btn-primary" id="report-submit" data-i18n="report_submit">{{ i18n.report_submit }}</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  {% endif %}
+
+  <script>window.PROMPTYA_LANG = "{{ lang }}";window.PROMPTYA_USER = "{{ user.username|default:'' }}";window.PROMPTYA_AUTHENTICATED = {{ user.is_authenticated|yesno:"true,false" }};</script>
   <script src="{% static 'js/i18n.js' %}" defer></script>
   <script src="{% static 'js/theme.js' %}" defer></script>
   <script src="{% static 'js/nav.js' %}" defer></script>

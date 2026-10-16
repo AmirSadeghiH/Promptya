@@ -47,6 +47,15 @@ def post_list_queryset(viewer=None):
         )
     )
     if viewer is not None and getattr(viewer, "is_authenticated", False):
+        # Posts by users the viewer blocked (or who blocked the viewer) are
+        # invisible here, which is the single visibility rule every feed,
+        # search, category, tag and profile page goes through.
+        from moderation.services import blocked_user_ids
+
+        blocked_ids = blocked_user_ids(viewer)
+        if blocked_ids:
+            queryset = queryset.exclude(author_id__in=blocked_ids)
+
         queryset = queryset.annotate(
             viewer_liked=Exists(
                 Like.objects.filter(user=viewer, post_id=OuterRef("pk"))
