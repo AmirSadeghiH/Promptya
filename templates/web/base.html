@@ -266,7 +266,9 @@
         <h4 data-i18n="categories">{{ i18n.categories }}</h4>
         <div class="chip-list">
           {% for category in categories %}
-            <a class="chip" href="{% url 'web:category' category.slug %}">{{ category.name }}</a>
+            {% if category.slug %}
+              <a class="chip" href="{% url 'web:category' category.slug %}">{{ category.name }}</a>
+            {% endif %}
           {% endfor %}
         </div>
       </div>
@@ -335,10 +337,11 @@
       <div class="sidebar-section">
         <h4 data-i18n="categories">{{ i18n.categories }}</h4>
         <div class="chip-list">
-          {% for category in categories %}
+        {% for category in categories %}
+          {% if category.slug %}
             <a class="chip" href="{% url 'web:category' category.slug %}">{{ category.name }}</a>
-          {% endfor %}
-        </div>
+          {% endif %}
+        {% endfor %}
       </div>
 
       <footer class="sidebar-footer">
@@ -385,11 +388,12 @@
       </nav>
 
       {% if categories %}
-        {# Pages that build their own context (login, signup) pass no categories. #}
         <nav class="footer-col" aria-labelledby="footer-categories">
           <h4 id="footer-categories" data-i18n="categories">{{ i18n.categories }}</h4>
           {% for category in categories|slice:":6" %}
-            <a href="{% url 'web:category' category.slug %}">{{ category.name }}</a>
+            {% if category.slug %}
+              <a href="{% url 'web:category' category.slug %}">{{ category.name }}</a>
+            {% endif %}
           {% endfor %}
         </nav>
       {% endif %}

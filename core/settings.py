@@ -42,7 +42,7 @@ DEBUG = _env_bool("DJANGO_DEBUG", default=True)
 # In development/test, allow testserver and localhost for convenience.
 _allowed_hosts = [h for h in os.environ.get("DJANGO_ALLOWED_HOSTS", "").split(",") if h]
 if DEBUG or _is_testing():
-    _allowed_hosts += ["testserver", "localhost", "127.0.0.1"]
+    _allowed_hosts += ["testserver", "localhost", "127.0.0.1", "192.168.1.5"]
 ALLOWED_HOSTS = _allowed_hosts
 
 # --- Canonical site identity -------------------------------------------------
